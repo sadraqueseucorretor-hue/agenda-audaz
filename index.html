@@ -245,7 +245,117 @@
         .form-multi-opts { display:flex; flex-direction:column; gap:4px; }
         .form-multi-opts label { display:flex; align-items:center; gap:8px; font-size:14px; color:var(--texto-principal); cursor:pointer; padding:4px 0; text-transform:none; font-weight:400; }
 
-        @media (max-width:1024px) { .admin-grid, .dashboard-row { grid-template-columns:1fr; } .kpi-container { grid-template-columns:repeat(2,1fr); } .tipo-grid { grid-template-columns:repeat(3,1fr); } .exib-col-layout { grid-template-columns:1fr; } }
+        /* ======= OVERFLOW MÊS ======= */
+        .mais-eventos { font-size:10px; font-weight:700; color:var(--cor-botoes); padding:2px 6px; border-radius:4px; background:rgba(212,175,55,.1); cursor:pointer; text-align:center; border:1px solid rgba(212,175,55,.2); }
+        .mais-eventos:hover { background:rgba(212,175,55,.2); }
+
+        /* ======= TABLET ======= */
+        @media (max-width:1024px) {
+            .admin-grid, .dashboard-row { grid-template-columns:1fr; }
+            .kpi-container { grid-template-columns:repeat(2,1fr); }
+            .tipo-grid { grid-template-columns:repeat(3,1fr); }
+            .exib-col-layout { grid-template-columns:1fr; }
+        }
+
+        /* ======= MOBILE ======= */
+        @media (max-width:768px) {
+            body { padding-bottom: 80px; }
+
+            /* Header */
+            .main-header { padding:10px 14px; flex-wrap:wrap; gap:8px; }
+            .brand-name { font-size:15px; }
+            .logo-preview-img { height:30px; }
+            .logo-fallback { width:30px; height:30px; font-size:13px; }
+            .nav-actions { gap:6px; }
+            .nav-actions .btn-outline span[data-lucide] ~ * { display:none; } /* só ícone no botão */
+            .btn-outline { padding:8px 10px; font-size:12px; }
+            .btn-custom  { padding:8px 12px; font-size:12px; }
+
+            /* App container */
+            .app-container { margin:12px auto; padding:0 10px; }
+
+            /* Controles de agenda */
+            .agenda-controls { padding:12px; gap:10px; flex-direction:column; align-items:stretch; }
+            .controls-left { flex-wrap:wrap; gap:8px; }
+            .period-title { font-size:16px; min-width:0; flex:1; }
+            .filters-group { flex-wrap:wrap; }
+            .select-filter { flex:1; min-width:120px; font-size:12px; padding:7px 10px; }
+            .view-switcher { width:100%; }
+            .btn-view { flex:1; font-size:12px; padding:7px 4px; }
+
+            /* Calendário mês — células menores */
+            .day-cell { min-height:70px; padding:4px 3px 3px; gap:2px; }
+            .day-number { font-size:11px; }
+            .day-cell.today .day-number { width:18px; height:18px; font-size:10px; }
+            .month-header-cell { font-size:9px; padding:6px 2px; }
+            .event-card.card-mes { padding:3px 5px 2px; }
+            .event-card.card-mes .ec-hora { font-size:9px; }
+            .event-card.card-mes .ec-nome { font-size:10px; }
+            .event-card.card-mes .ec-sub  { display:none; }
+
+            /* Semana/Dia — scroll horizontal na semana */
+            .calendar-wrapper { overflow-x:auto; }
+            .grid-weekly-day { grid-template-columns:44px repeat(7,120px); min-width:884px; }
+            .grid-single-day { grid-template-columns:44px 1fr; }
+            .time-slot-label { font-size:9px; }
+            .time-col-header { height:72px; }
+            .column-header { height:72px; padding:8px 4px; }
+            .col-dia-num  { font-size:22px; }
+            .col-dia-nome { font-size:9px; }
+            .col-visit-badge { font-size:9px; padding:1px 5px; }
+            .event-card.card-semana { left:2px; right:2px; padding:5px 6px; }
+            .event-card.card-semana .ec-nome { font-size:11px; }
+
+            /* KPIs */
+            .kpi-container { grid-template-columns:repeat(2,1fr); gap:8px; }
+            .kpi-card { padding:12px; }
+            .kpi-value { font-size:20px; }
+            .kpi-label { font-size:10px; }
+
+            /* Admin grid */
+            .admin-grid { grid-template-columns:1fr; gap:12px; }
+            .sidebar-admin { flex-direction:row; flex-wrap:wrap; padding:10px; gap:4px; }
+            .admin-menu-btn { width:auto; padding:8px 10px; font-size:12px; flex:1; min-width:120px; border-left-width:1px !important; }
+            .admin-menu-btn.active { border-left-width:4px !important; }
+            .sidebar-brand-box { display:none; }
+
+            /* Tabela dashboard */
+            .data-table-box { padding:14px; }
+            .crm-table { font-size:12px; }
+            .crm-table th, .crm-table td { padding:8px 6px; }
+            .dashboard-row { grid-template-columns:1fr; }
+
+            /* Modais */
+            .modal-card { padding:20px 16px; margin:10px; max-height:95vh; border-radius:10px; }
+            .modal-card.modal-lg { max-width:100%; }
+            .tipo-grid { grid-template-columns:repeat(3,1fr); gap:6px; }
+            .tipo-btn { padding:8px 4px; font-size:10px; }
+            .tipo-btn span { font-size:16px; }
+
+            /* Exibição config */
+            .exib-tabs { flex-wrap:wrap; }
+            .exib-tab { min-width:45%; font-size:11px; }
+            .card-size-selector { gap:6px; }
+
+            /* Formulário */
+            .form-grid-2 { grid-template-columns:1fr; }
+            .color-picker-grid { grid-template-columns:1fr; }
+
+            /* Toast */
+            .toast-notification { left:14px; right:14px; bottom:14px; text-align:center; }
+
+            /* Date picker */
+            .datepicker-popup { width:calc(100vw - 40px); left:50%; transform:translateX(-50%); }
+        }
+
+        /* Botão flutuante mobile para adicionar visita */
+        .fab-add { display:none; }
+        @media (max-width:768px) {
+            .fab-add { display:flex; position:fixed; bottom:20px; right:20px; width:52px; height:52px; background:var(--cor-botoes); border-radius:50%; align-items:center; justify-content:center; font-size:26px; color:#111; font-weight:bold; cursor:pointer; z-index:500; box-shadow:0 4px 16px rgba(212,175,55,.4); border:none; }
+            .fab-add:active { transform:scale(.94); }
+            /* Esconder botão de adicionar no header em mobile */
+            .public-badge .btn-custom { display:none; }
+        }
 
         /* ======== DATE PICKER CUSTOMIZADO ======== */
         .datepicker-wrapper { position:relative; }
@@ -280,6 +390,7 @@
 <body>
 
 <div class="toast-notification" id="toastMsg">Alterações salvas com sucesso.</div>
+<button class="fab-add" onclick="solicitarAberturaCriacaoVisita()" title="Nova Visita">+</button>
 
 <header class="main-header">
     <div class="brand-area">
@@ -674,6 +785,15 @@
 
     document.addEventListener("DOMContentLoaded", async () => {
         lucide.createIcons();
+
+        // Mobile: começa na visão "dia" por padrão
+        if (window.innerWidth < 768) {
+            visaoAtiva = 'dia';
+            document.querySelectorAll('.btn-view').forEach(b => b.classList.remove('active'));
+            const btnDia = document.getElementById('btnViewdia');
+            if (btnDia) btnDia.classList.add('active');
+        }
+
         await Promise.all([
             carregarConfiguracoesPlataforma(),
             sincronizarTabelasSupabase(),
@@ -949,7 +1069,44 @@
         </div>`;
     }
 
-    function montarCardSemana(visita) {
+    // Detecta sobreposição e distribui eventos lado a lado
+    function calcularLayoutColisao(visitas) {
+        const toMin = h => {
+            const [hh, mm] = h.split(':').map(Number);
+            return hh * 60 + (mm || 0);
+        };
+        const DURACAO = 50; // minutos assumidos por visita
+
+        const sorted = [...visitas].sort((a, b) => a.horario > b.horario ? 1 : -1);
+        const colunas = []; // cada coluna é array de {inicio, fim}
+        const mapa = sorted.map(v => {
+            const ini = toMin(v.horario);
+            const fim = ini + DURACAO;
+            let c = 0;
+            while (true) {
+                if (!colunas[c]) { colunas[c] = []; }
+                const livre = colunas[c].every(slot => fim <= slot.ini || ini >= slot.fim);
+                if (livre) { colunas[c].push({ ini, fim }); break; }
+                c++;
+            }
+            return { visita: v, col: c };
+        });
+
+        // Para cada evento, descobrir quantas colunas realmente se sobrepõem no seu intervalo
+        return mapa.map(item => {
+            const ini = toMin(item.visita.horario);
+            const fim = ini + DURACAO;
+            const sobrepostos = mapa.filter(o => {
+                const oIni = toMin(o.visita.horario);
+                const oFim = oIni + DURACAO;
+                return oIni < fim && oFim > ini;
+            });
+            const totalCols = Math.max(...sobrepostos.map(o => o.col)) + 1;
+            return { visita: item.visita, col: item.col, totalCols };
+        });
+    }
+
+    function montarCardSemana(visita, colIdx = 0, totalCols = 1) {
         const cfg = exibicaoConfig || {};
         const campos = cfg.campos_calendario || ['horario', 'cliente'];
         const tamanho = cfg.card_tamanho || 'medio';
@@ -969,13 +1126,20 @@
         const m = parseInt(visita.horario.split(":")[1] || 0);
         const top = 88 + (h * 60) + m;
 
-        const linhasHTML = tamanho !== 'pequeno'
+        // Posicionamento lado a lado para eventos sobrepostos
+        const pct = 100 / totalCols;
+        const leftPct  = colIdx * pct;
+        const widthPct = pct;
+        const gapPx = totalCols > 1 ? 2 : 4;
+        const posStyle = `left:calc(${leftPct}% + ${gapPx}px);width:calc(${widthPct}% - ${gapPx * 2}px);`;
+
+        const linhasHTML = tamanho !== 'pequeno' && totalCols === 1
             ? linhasSecundarias.slice(0, tamanho === 'grande' ? 4 : 2)
                 .map(v => `<div class="ec-linha">${v}</div>`).join('')
             : '';
 
         return { top, altura, html: `
-            <div class="event-card card-semana st-${visita.status}" style="top:${top}px;height:${altura}px;" onclick="solicitarAberturaEdicaoVisita(${visita.id})">
+            <div class="event-card card-semana st-${visita.status}" style="top:${top}px;height:${altura}px;${posStyle}" onclick="solicitarAberturaEdicaoVisita(${visita.id})">
                 <div class="ec-topo">
                     <span class="ec-hora-badge">${hora}</span>
                     <span class="ec-status-dot"></span>
@@ -1019,9 +1183,15 @@
                 cell.className = `day-cell${ehHoje ? ' today' : ''}`;
                 cell.dataset.date = iso;
                 cell.innerHTML = `<span class="day-number">${d}</span>`;
-                filtradas.filter(v => v.data === iso)
-                    .sort((a,b) => a.horario > b.horario ? 1 : -1)
-                    .forEach(v => { cell.insertAdjacentHTML('beforeend', montarCardMes(v)); });
+                const visitasDia = filtradas.filter(v => v.data === iso)
+                    .sort((a,b) => a.horario > b.horario ? 1 : -1);
+                const MAX_MES = window.innerWidth < 768 ? 2 : 3;
+                visitasDia.slice(0, MAX_MES).forEach(v => { cell.insertAdjacentHTML('beforeend', montarCardMes(v)); });
+                if (visitasDia.length > MAX_MES) {
+                    const extra = visitasDia.length - MAX_MES;
+                    cell.insertAdjacentHTML('beforeend',
+                        `<div class="mais-eventos" onclick="mudarModoEscopoCalendario('dia');dataFoco=new Date('${iso}T12:00:00');renderizarComponenteCalendarioBase()">+${extra} mais</div>`);
+                }
                 grid.appendChild(cell);
             }
             target.appendChild(grid);
@@ -1070,9 +1240,11 @@
                     col.appendChild(hRow);
                 }
 
-                // Cards de visitas
-                visitasDia.sort((a,b) => a.horario > b.horario ? 1 : -1)
-                    .forEach(v => { col.insertAdjacentHTML('beforeend', montarCardSemana(v).html); });
+                // Cards de visitas com detecção de colisão
+                const layout = calcularLayoutColisao(visitasDia);
+                layout.forEach(({ visita, col: cIdx, totalCols }) => {
+                    col.insertAdjacentHTML('beforeend', montarCardSemana(visita, cIdx, totalCols).html);
+                });
 
                 // Linha vermelha do horário atual (só hoje)
                 if (ehHoje) {
