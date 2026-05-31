@@ -25,8 +25,8 @@
 
         .main-header { background:var(--cor-menu-lateral); padding:15px 30px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--bordas); box-shadow:var(--shadow); }
         .brand-area { display:flex; align-items:center; gap:12px; }
-        .logo-preview-img { height:42px; max-width:160px; object-fit:contain; display:block; }
-        .logo-fallback { width:40px; height:40px; background:var(--cor-botoes); border-radius:6px; display:flex; align-items:center; justify-content:center; font-weight:bold; color:#111; }
+        .logo-preview-img { height:58px; max-width:200px; object-fit:contain; display:block; }
+        .logo-fallback { width:52px; height:52px; background:var(--cor-botoes); border-radius:8px; display:flex; align-items:center; justify-content:center; font-weight:bold; color:#111; font-size:22px; }
         .brand-name { font-size:20px; font-weight:700; letter-spacing:1px; text-transform:uppercase; }
         .brand-name span { color:var(--cor-botoes); }
         .nav-actions { display:flex; gap:12px; align-items:center; }
@@ -264,8 +264,8 @@
             /* Header */
             .main-header { padding:10px 14px; flex-wrap:wrap; gap:8px; }
             .brand-name { font-size:15px; }
-            .logo-preview-img { height:30px; }
-            .logo-fallback { width:30px; height:30px; font-size:13px; }
+            .logo-preview-img { height:40px; }
+            .logo-fallback { width:40px; height:40px; font-size:16px; }
             .nav-actions { gap:6px; }
             .nav-actions .btn-outline span[data-lucide] ~ * { display:none; } /* só ícone no botão */
             .btn-outline { padding:8px 10px; font-size:12px; }
@@ -617,7 +617,7 @@
                                     <input type="file" class="form-control" accept="image/png,image/jpeg" onchange="processarLeituraBinariaLogo(this)">
                                     <div style="margin-top:15px;">
                                         <p style="font-size:11px;color:var(--texto-secundario);margin-bottom:5px;">Visualização prévia:</p>
-                                        <img id="imgPreviewConfig" class="logo-preview-img" style="background:rgba(0,0,0,.4);padding:8px;border-radius:6px;display:none;">
+                                        <img id="imgPreviewConfig" class="logo-preview-img" style="background:rgba(0,0,0,.4);padding:8px;border-radius:6px;display:none;height:70px;max-width:260px;">
                                     </div>
                                 </div>
                                 <div class="form-group" style="margin-top:25px;display:flex;gap:10px;">
@@ -781,7 +781,7 @@
     ];
 
     const coresOriginaisFabrica = {
-        nomeEmpresa:"Agenda Audaz", senhaAdmin:"admin123",
+        nomeEmpresa:"Minha Imobiliária", senhaAdmin:"admin123",
         bgPrincipal:"#0A0A0A", bgCard:"#141414", botoes:"#D4AF37",
         textoPrincipal:"#F5F5F7", textoSecundario:"#A0A0A5",
         menuLateral:"#111111", calendario:"#18181C",
@@ -907,7 +907,15 @@
         root.style.setProperty('--st-reagendada', data.co_st_reagendada);
         root.style.setProperty('--st-cancelada', data.co_st_cancelada);
 
-        document.getElementById("txtLogoTexto").innerHTML = `${data.nome_empresa || 'Agenda'} <span>Audaz</span>`;
+        // Nome completo sem "Audaz" hardcoded — usa o que o admin definiu
+        const nomeCompleto = data.nome_empresa || 'Agenda Audaz';
+        const partes = nomeCompleto.trim().split(' ');
+        const primeirasPalavras = partes.slice(0, -1).join(' ') || partes[0];
+        const ultimaPalavra = partes.length > 1 ? partes[partes.length - 1] : '';
+        document.getElementById("txtLogoTexto").innerHTML = ultimaPalavra
+            ? `${esc(primeirasPalavras)} <span>${esc(ultimaPalavra)}</span>`
+            : esc(primeirasPalavras);
+        document.title = nomeCompleto + ' | CRM Imobiliário';
         const htmlLogo = base64LogoSalva
             ? `<img src="${base64LogoSalva}" class="logo-preview-img" alt="Logo">`
             : `<div class="logo-fallback">A</div>`;
@@ -2104,21 +2112,23 @@
         const planilha = XLSX.utils.json_to_sheet(dados);
         const livro = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(livro, planilha, "Visitas");
-        XLSX.writeFile(livro, "Agenda_Audaz_Relatorio.xlsx");
+        const nomeArq = (memCacheConfig?.nome_empresa || 'Agenda').replace(/\s+/g,'_');
+        XLSX.writeFile(livro, `${nomeArq}_Relatorio.xlsx`);
     }
 
     function gerarExportacaoDocumentoPDF() {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
         doc.setFont("Helvetica","bold"); doc.setFontSize(18);
-        doc.text("Agenda Audaz - Relatório Gerencial", 14, 20);
+        doc.text(`${memCacheConfig?.nome_empresa || 'Agenda'} - Relatório Gerencial`, 14, 20);
         doc.setFontSize(10); doc.setFont("Helvetica","normal");
         doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`, 14, 26);
         const cols = exibicaoConfig?.campos_relatorio || ['cliente','corretor','empreendimento','data','horario','status'];
         const cabecalho = cols.map(k => getLabelExibicao(k));
         const linhas = filtrarVisitasPorPeriodoAdmin(visitasCache).map(v => cols.map(k => getValorExibicao(v, k)));
         doc.autoTable({ startY:32, head:[cabecalho], body:linhas, theme:'striped', headStyles:{ fillColor:[212,175,55], textColor:[17,17,17] } });
-        doc.save("Agenda_Audaz_Relatorio.pdf");
+        const nomeArqPdf = (memCacheConfig?.nome_empresa || 'Agenda').replace(/\s+/g,'_');
+        doc.save(`${nomeArqPdf}_Relatorio.pdf`);
     }
 
     // ===== DATE PICKER CUSTOMIZADO =====
