@@ -1,0 +1,1880 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agenda Audaz | CRM Premium de Gestão Imobiliária</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.29/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        :root {
+            --bg-principal: #0A0A0A; --bg-card: #141414; --cor-botoes: #D4AF37;
+            --texto-principal: #F5F5F7; --texto-secundario: #A0A0A5;
+            --cor-menu-lateral: #111111; --cor-calendario: #18181C;
+            --bordas: rgba(255,255,255,0.08);
+            --st-agendada: #FFD700; --st-compareceu: #2ECC71; --st-nao-comp: #E74C3C;
+            --st-reagendada: #3498DB; --st-cancelada: #95A5A6;
+            --font-sistema: 'Inter', sans-serif; --shadow: 0 4px 30px rgba(0,0,0,0.4);
+        }
+        * { margin:0; padding:0; box-sizing:border-box; font-family:var(--font-sistema); }
+        body { background:var(--bg-principal); color:var(--texto-principal); padding-bottom:40px; }
+
+        .main-header { background:var(--cor-menu-lateral); padding:15px 30px; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--bordas); box-shadow:var(--shadow); }
+        .brand-area { display:flex; align-items:center; gap:12px; }
+        .logo-preview-img { height:42px; max-width:160px; object-fit:contain; display:block; }
+        .logo-fallback { width:40px; height:40px; background:var(--cor-botoes); border-radius:6px; display:flex; align-items:center; justify-content:center; font-weight:bold; color:#111; }
+        .brand-name { font-size:20px; font-weight:700; letter-spacing:1px; text-transform:uppercase; }
+        .brand-name span { color:var(--cor-botoes); }
+        .nav-actions { display:flex; gap:12px; align-items:center; }
+
+        .btn-custom { background:var(--cor-botoes); color:#111; border:none; padding:10px 20px; border-radius:6px; font-weight:600; cursor:pointer; transition:opacity .2s,transform .1s; display:inline-flex; align-items:center; gap:8px; }
+        .btn-custom:hover { opacity:.9; transform:translateY(-1px); }
+        .btn-outline { background:transparent; border:1px solid var(--bordas); color:var(--texto-principal); padding:9px 18px; border-radius:6px; cursor:pointer; font-weight:500; transition:all .2s; display:inline-flex; align-items:center; gap:8px; }
+        .btn-outline:hover { border-color:var(--cor-botoes); color:var(--cor-botoes); }
+        .btn-danger { background:#E74C3C; color:#fff; border:none; padding:8px 14px; border-radius:6px; font-weight:600; cursor:pointer; }
+        .btn-sm { padding:5px 10px; font-size:12px; }
+
+        .app-container { max-width:1700px; margin:25px auto; padding:0 20px; }
+        .view-section { display:none; }
+        .view-section.active { display:block; }
+
+        .public-badge { background:var(--bg-card); border-left:4px solid var(--cor-botoes); color:var(--texto-principal); padding:15px; border-radius:8px; margin-bottom:20px; font-size:14px; display:flex; justify-content:space-between; align-items:center; box-shadow:var(--shadow); border-top:1px solid var(--bordas); border-right:1px solid var(--bordas); border-bottom:1px solid var(--bordas); }
+        .agenda-controls { background:var(--bg-card); padding:20px; border-radius:12px; border:1px solid var(--bordas); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px; margin-bottom:20px; box-shadow:var(--shadow); }
+        .controls-left { display:flex; align-items:center; gap:15px; }
+        .period-title { font-size:20px; font-weight:600; min-width:180px; }
+        .filters-group { display:flex; gap:10px; }
+        .select-filter { background:var(--bg-principal); border:1px solid var(--bordas); color:var(--texto-principal); padding:8px 14px; border-radius:6px; cursor:pointer; font-weight:500; outline:none; }
+        .view-switcher { display:flex; background:var(--bg-principal); padding:4px; border-radius:8px; border:1px solid var(--bordas); }
+        .btn-view { background:none; border:none; color:var(--texto-secundario); padding:6px 14px; border-radius:6px; cursor:pointer; font-weight:600; }
+        .btn-view.active { background:var(--cor-botoes); color:#111; }
+
+        .calendar-wrapper { background:var(--cor-calendario); border:1px solid var(--bordas); border-radius:12px; box-shadow:var(--shadow); overflow:hidden; min-height:600px; }
+        .grid-month { display:grid; grid-template-columns:repeat(7,1fr); }
+        .month-header-cell { background:rgba(0,0,0,.2); text-align:center; padding:10px 4px; font-weight:700; font-size:11px; color:var(--texto-secundario); border-bottom:1px solid var(--bordas); text-transform:uppercase; letter-spacing:.5px; }
+        .day-cell { border-right:1px solid var(--bordas); border-bottom:1px solid var(--bordas); min-height:120px; padding:6px 5px 5px; display:flex; flex-direction:column; gap:3px; position:relative; background:var(--cor-calendario); transition:background .12s; }
+        .day-cell:hover { background:rgba(255,255,255,.015); }
+        .day-cell:nth-child(7n) { border-right:none; }
+        .day-cell.empty { background:rgba(0,0,0,.08); opacity:.2; pointer-events:none; }
+        .day-number { font-weight:600; font-size:12px; align-self:flex-end; color:var(--texto-secundario); margin-bottom:2px; }
+        .day-cell.today { background:rgba(212,175,55,.04); }
+        .day-cell.today .day-number { background:var(--cor-botoes); color:#111; width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:11px; }
+
+        .grid-weekly-day { display:grid; grid-template-columns:75px repeat(7,1fr); }
+        .grid-single-day { display:grid; grid-template-columns:75px 1fr; }
+        .time-col { border-right:1px solid var(--bordas); background:rgba(0,0,0,.1); }
+        .time-slot-label { height:60px; display:flex; align-items:center; justify-content:center; font-size:11px; color:var(--texto-secundario); border-bottom:1px solid var(--bordas); }
+        .column-day { border-right:1px solid var(--bordas); position:relative; background:var(--cor-calendario); min-height:720px; }
+        .column-header { text-align:center; padding:10px; border-bottom:1px solid var(--bordas); background:rgba(0,0,0,.15); }
+
+        /* ======== CARDS DE EVENTO REDESENHADOS ======== */
+        .event-card { border-radius:6px; cursor:pointer; overflow:hidden; border-left:3px solid transparent; transition:transform .12s, box-shadow .12s, filter .12s; position:relative; margin-bottom:3px; }
+        .event-card:hover { transform:translateY(-1px); box-shadow:0 4px 14px rgba(0,0,0,.4); filter:brightness(1.08); }
+
+        /* Fundo com gradiente sutil baseado na cor de status */
+        .event-card.st-agendada    { border-left-color:var(--st-agendada);    background:linear-gradient(135deg, rgba(255,215,0,.10) 0%, rgba(255,255,255,.03) 100%); }
+        .event-card.st-compareceu  { border-left-color:var(--st-compareceu);  background:linear-gradient(135deg, rgba(46,204,113,.10) 0%, rgba(255,255,255,.03) 100%); }
+        .event-card.st-nao_compareceu { border-left-color:var(--st-nao-comp); background:linear-gradient(135deg, rgba(231,76,60,.10)  0%, rgba(255,255,255,.03) 100%); }
+        .event-card.st-reagendada  { border-left-color:var(--st-reagendada);  background:linear-gradient(135deg, rgba(52,152,219,.10) 0%, rgba(255,255,255,.03) 100%); }
+        .event-card.st-cancelada   { border-left-color:var(--st-cancelada);   background:rgba(255,255,255,.02); opacity:.5; }
+        .event-card.st-cancelada .ec-nome { text-decoration:line-through; }
+
+        /* Visão MÊS — card compacto */
+        .event-card.card-mes { padding:5px 7px 4px; }
+        .event-card.card-mes .ec-hora  { font-size:10px; font-weight:700; color:var(--cor-botoes); margin-bottom:1px; display:flex; align-items:center; gap:4px; }
+        .event-card.card-mes .ec-hora::before { content:''; width:5px; height:5px; border-radius:50%; background:currentColor; flex-shrink:0; filter:brightness(1.2); }
+        .event-card.card-mes.st-agendada    .ec-hora { color:var(--st-agendada); }
+        .event-card.card-mes.st-compareceu  .ec-hora { color:var(--st-compareceu); }
+        .event-card.card-mes.st-nao_compareceu .ec-hora { color:var(--st-nao-comp); }
+        .event-card.card-mes.st-reagendada  .ec-hora { color:var(--st-reagendada); }
+        .event-card.card-mes.st-cancelada   .ec-hora { color:var(--st-cancelada); }
+        .event-card.card-mes .ec-nome  { font-size:11px; font-weight:600; color:var(--texto-principal); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.3; }
+        .event-card.card-mes .ec-sub   { font-size:10px; color:var(--texto-secundario); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.3; margin-top:1px; }
+        .event-card.card-mes.card-pequeno { padding:3px 6px; }
+        .event-card.card-mes.card-pequeno .ec-hora { font-size:9px; }
+        .event-card.card-mes.card-pequeno .ec-nome { font-size:10px; }
+        .event-card.card-mes.card-grande   { padding:7px 9px 6px; }
+        .event-card.card-mes.card-grande .ec-hora { font-size:11px; }
+        .event-card.card-mes.card-grande .ec-nome { font-size:12px; }
+
+        /* Visão SEMANA/DIA — card posicionado */
+        .event-card.card-semana { position:absolute; left:4px; right:4px; border-radius:6px; z-index:5; padding:6px 8px; }
+        .event-card.card-semana .ec-hora-badge { display:inline-flex; align-items:center; gap:4px; font-size:10px; font-weight:700; padding:1px 6px; border-radius:10px; margin-bottom:4px; background:rgba(0,0,0,.25); color:#fff; }
+        .event-card.card-semana .ec-nome  { font-size:11px; font-weight:700; color:var(--texto-principal); line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .event-card.card-semana .ec-sub   { font-size:10px; color:rgba(255,255,255,.65); line-height:1.3; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+        /* Fallback para tags antigas (compatibilidade) */
+        .event-tag { display:none; }
+        .event-absolute { position:absolute; left:4px; right:4px; z-index:5; overflow:hidden; border-radius:6px; }
+
+        .admin-grid { display:grid; grid-template-columns:260px 1fr; gap:25px; margin-top:20px; }
+        .sidebar-admin { background:var(--cor-menu-lateral); border:1px solid var(--bordas); padding:20px; border-radius:12px; display:flex; flex-direction:column; gap:8px; box-shadow:var(--shadow); align-self:start; }
+        .admin-menu-btn { width:100%; text-align:left; padding:12px 15px; background:none; border:1px solid transparent; color:var(--texto-principal); border-radius:6px; cursor:pointer; font-weight:500; display:flex; align-items:center; gap:10px; transition:all .2s; }
+        .admin-menu-btn:hover { background:rgba(255,255,255,.02); }
+        .admin-menu-btn.active { background:var(--bg-principal); border-color:var(--bordas); border-left:4px solid var(--cor-botoes); color:var(--texto-principal); font-weight:600; }
+        .sidebar-brand-box { text-align:center; padding-bottom:20px; border-bottom:1px solid var(--bordas); margin-bottom:15px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; }
+        .sidebar-logo { max-height:60px; max-width:100%; object-fit:contain; }
+
+        .kpi-container { display:grid; grid-template-columns:repeat(5,1fr); gap:15px; margin-bottom:25px; }
+        .kpi-card { background:var(--bg-card); border:1px solid var(--bordas); padding:20px; border-radius:12px; box-shadow:var(--shadow); }
+        .kpi-label { font-size:11px; color:var(--texto-secundario); text-transform:uppercase; font-weight:600; letter-spacing:.5px; }
+        .kpi-value { font-size:26px; font-weight:700; margin-top:5px; }
+
+        .dashboard-row { display:grid; grid-template-columns:2fr 1fr; gap:20px; }
+        .data-table-box { background:var(--bg-card); border:1px solid var(--bordas); border-radius:12px; padding:25px; box-shadow:var(--shadow); margin-bottom:25px; }
+        .table-title { font-size:16px; font-weight:600; margin-bottom:20px; display:flex; justify-content:space-between; align-items:center; }
+        .crm-table { width:100%; border-collapse:collapse; text-align:left; font-size:14px; }
+        .crm-table th { padding:14px; border-bottom:2px solid var(--bordas); color:var(--texto-secundario); font-weight:600; background:rgba(0,0,0,.05); }
+        .crm-table td { padding:14px; border-bottom:1px solid var(--bordas); color:var(--texto-principal); }
+
+        .form-group { margin-bottom:18px; }
+        .form-group label { display:block; font-size:12px; color:var(--texto-secundario); margin-bottom:6px; font-weight:600; text-transform:uppercase; }
+        .form-control { width:100%; padding:12px 16px; background:var(--bg-principal); border:1px solid var(--bordas); color:var(--texto-principal); border-radius:6px; outline:none; font-size:14px; }
+        .form-control:focus { border-color:var(--cor-botoes); }
+
+        .color-picker-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }
+        .color-picker-item { background:var(--bg-principal); border:1px solid var(--bordas); padding:10px; border-radius:8px; display:flex; align-items:center; justify-content:space-between; font-size:13px; }
+        .color-picker-item input[type="color"] { border:none; width:30px; height:30px; border-radius:4px; cursor:pointer; background:none; }
+
+        .modal-overlay { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,.85); display:flex; justify-content:center; align-items:center; z-index:1000; opacity:0; pointer-events:none; transition:opacity .2s; }
+        .modal-overlay.active { opacity:1; pointer-events:auto; }
+        .modal-card { background:var(--bg-card); border:1px solid var(--bordas); width:100%; max-width:580px; padding:30px; border-radius:12px; box-shadow:var(--shadow); position:relative; max-height:90vh; overflow-y:auto; }
+        .modal-card.modal-lg { max-width:780px; }
+        .modal-footer { display:flex; justify-content:flex-end; gap:10px; margin-top:25px; }
+        .btn-close-modal { position:absolute; top:20px; right:20px; background:none; border:none; color:var(--texto-secundario); font-size:22px; cursor:pointer; }
+
+        .toast-notification { position:fixed; bottom:25px; right:25px; background:#2ECC71; color:#FFF; padding:15px 30px; border-radius:6px; font-weight:600; box-shadow:0 5px 20px rgba(0,0,0,.3); z-index:9999; transform:translateY(100px); opacity:0; transition:all .3s cubic-bezier(.68,-.55,.265,1.55); }
+        .toast-notification.active { transform:translateY(0); opacity:1; }
+        .badge-status-pill { padding:3px 10px; border-radius:20px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; display:inline-block; }
+        .badge-status-pill.st-agendada    { background:rgba(255,215,0,.12);   color:var(--st-agendada);   border:1px solid rgba(255,215,0,.25); }
+        .badge-status-pill.st-compareceu  { background:rgba(46,204,113,.12);  color:var(--st-compareceu); border:1px solid rgba(46,204,113,.25); }
+        .badge-status-pill.st-nao_compareceu { background:rgba(231,76,60,.12); color:var(--st-nao-comp);  border:1px solid rgba(231,76,60,.25); }
+        .badge-status-pill.st-reagendada  { background:rgba(52,152,219,.12);  color:var(--st-reagendada); border:1px solid rgba(52,152,219,.25); }
+        .badge-status-pill.st-cancelada   { background:rgba(149,165,166,.08); color:var(--st-cancelada);  border:1px solid rgba(149,165,166,.2); }
+
+        /* ======== CAMPOS CONFIG UI ======== */
+        .campo-list { display:flex; flex-direction:column; gap:6px; }
+        .campo-row { background:var(--bg-principal); border:1px solid var(--bordas); border-radius:8px; padding:12px 14px; display:flex; align-items:center; gap:12px; cursor:grab; user-select:none; transition:all .15s; }
+        .campo-row:active { cursor:grabbing; }
+        .campo-row.dragging { opacity:.4; border:2px dashed var(--cor-botoes); }
+        .campo-row.drag-over { border-top:3px solid var(--cor-botoes); }
+        .drag-handle { color:var(--texto-secundario); font-size:18px; cursor:grab; flex-shrink:0; }
+        .campo-info { flex:1; }
+        .campo-nome { font-weight:600; font-size:14px; }
+        .campo-tipo-tag { display:inline-block; background:rgba(255,255,255,.05); border:1px solid var(--bordas); border-radius:4px; padding:2px 7px; font-size:11px; color:var(--texto-secundario); margin-top:2px; }
+        .campo-badges { display:flex; gap:6px; align-items:center; }
+        .campo-badge { padding:3px 8px; border-radius:20px; font-size:10px; font-weight:700; text-transform:uppercase; }
+        .badge-obrig { background:rgba(231,76,60,.15); color:#E74C3C; border:1px solid rgba(231,76,60,.3); }
+        .badge-opcl { background:rgba(160,160,165,.1); color:var(--texto-secundario); border:1px solid var(--bordas); }
+        .badge-visivel { background:rgba(46,204,113,.1); color:#2ECC71; border:1px solid rgba(46,204,113,.3); }
+        .badge-oculto { background:rgba(160,160,165,.1); color:var(--texto-secundario); border:1px solid var(--bordas); }
+        .campo-acoes { display:flex; gap:6px; flex-shrink:0; }
+        .toggle-switch { position:relative; width:36px; height:20px; flex-shrink:0; }
+        .toggle-switch input { opacity:0; width:0; height:0; }
+        .toggle-slider { position:absolute; cursor:pointer; top:0; left:0; right:0; bottom:0; background:rgba(255,255,255,.1); border-radius:20px; transition:.3s; }
+        .toggle-slider:before { position:absolute; content:""; height:14px; width:14px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:.3s; }
+        input:checked + .toggle-slider { background:var(--cor-botoes); }
+        input:checked + .toggle-slider:before { transform:translateX(16px); }
+
+        /* ======== TIPO CAMPO SELECTOR ======== */
+        .tipo-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:8px; }
+        .tipo-btn { background:var(--bg-principal); border:1px solid var(--bordas); color:var(--texto-principal); padding:10px 6px; border-radius:8px; cursor:pointer; text-align:center; font-size:11px; font-weight:500; transition:all .15s; }
+        .tipo-btn:hover { border-color:var(--cor-botoes); }
+        .tipo-btn.selected { background:rgba(212,175,55,.15); border-color:var(--cor-botoes); color:var(--cor-botoes); }
+        .tipo-btn span { display:block; font-size:18px; margin-bottom:4px; }
+
+        /* ======== EXIBIÇÃO CONFIG UI ======== */
+        .exib-tabs { display:flex; gap:4px; background:var(--bg-principal); padding:4px; border-radius:8px; border:1px solid var(--bordas); margin-bottom:20px; }
+        .exib-tab { flex:1; text-align:center; padding:8px; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer; color:var(--texto-secundario); border:none; background:none; }
+        .exib-tab.active { background:var(--cor-botoes); color:#111; }
+        .exib-panel { display:none; }
+        .exib-panel.active { display:block; }
+        .exib-col-layout { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+        .exib-col-title { font-size:12px; font-weight:600; color:var(--texto-secundario); text-transform:uppercase; margin-bottom:10px; }
+        .exib-field-list { min-height:100px; border:1px dashed var(--bordas); border-radius:8px; padding:8px; display:flex; flex-direction:column; gap:4px; }
+        .exib-field-item { background:var(--bg-principal); border:1px solid var(--bordas); border-radius:6px; padding:9px 12px; display:flex; align-items:center; gap:8px; cursor:grab; font-size:13px; }
+        .exib-field-item:active { cursor:grabbing; }
+        .exib-field-item.dragging { opacity:.4; }
+        .exib-field-item.drag-over { border-top:3px solid var(--cor-botoes); }
+        .exib-field-item .drag-handle { font-size:14px; }
+        .exib-move-btn { background:none; border:1px solid var(--bordas); color:var(--texto-secundario); width:24px; height:24px; border-radius:4px; cursor:pointer; font-size:13px; line-height:1; display:flex; align-items:center; justify-content:center; margin-left:auto; }
+        .exib-move-btn:hover { border-color:var(--cor-botoes); color:var(--cor-botoes); }
+        .card-size-selector { display:flex; gap:10px; margin-top:8px; }
+        .card-size-opt { flex:1; background:var(--bg-principal); border:1px solid var(--bordas); border-radius:8px; padding:12px; text-align:center; cursor:pointer; transition:all .15s; }
+        .card-size-opt.selected { border-color:var(--cor-botoes); background:rgba(212,175,55,.1); }
+        .card-size-opt span { display:block; font-size:10px; color:var(--texto-secundario); margin-top:4px; }
+
+        /* ======== SISTEMA DE CAMPOS DYNÂMICOS FORM ======== */
+        .form-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+        .form-multi-opts { display:flex; flex-direction:column; gap:4px; }
+        .form-multi-opts label { display:flex; align-items:center; gap:8px; font-size:14px; color:var(--texto-principal); cursor:pointer; padding:4px 0; text-transform:none; font-weight:400; }
+
+        @media (max-width:1024px) { .admin-grid, .dashboard-row { grid-template-columns:1fr; } .kpi-container { grid-template-columns:repeat(2,1fr); } .tipo-grid { grid-template-columns:repeat(3,1fr); } .exib-col-layout { grid-template-columns:1fr; } }
+
+        /* ======== DATE PICKER CUSTOMIZADO ======== */
+        .datepicker-wrapper { position:relative; }
+        .datepicker-input { width:100%; padding:12px 16px; background:var(--bg-principal); border:1px solid var(--bordas); color:var(--texto-principal); border-radius:6px; font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:space-between; user-select:none; transition:border-color .2s; }
+        .datepicker-input:hover, .datepicker-input.open { border-color:var(--cor-botoes); }
+        .datepicker-input .dp-placeholder { color:var(--texto-secundario); }
+        .datepicker-input .dp-icon { color:var(--texto-secundario); font-size:16px; flex-shrink:0; }
+        .datepicker-popup { position:absolute; top:calc(100% + 8px); left:0; z-index:2000; background:var(--bg-card); border:1px solid var(--bordas); border-radius:12px; box-shadow:0 8px 40px rgba(0,0,0,.6); width:320px; padding:16px; animation:dpFadeIn .15s ease; }
+        .datepicker-popup.dp-up { top:auto; bottom:calc(100% + 8px); }
+        @keyframes dpFadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+        .dp-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+        .dp-nav { background:none; border:1px solid var(--bordas); color:var(--texto-principal); width:32px; height:32px; border-radius:6px; cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center; transition:all .15s; }
+        .dp-nav:hover { border-color:var(--cor-botoes); color:var(--cor-botoes); }
+        .dp-month-label { font-weight:700; font-size:15px; cursor:pointer; padding:4px 10px; border-radius:6px; transition:background .15s; }
+        .dp-month-label:hover { background:rgba(255,255,255,.05); }
+        .dp-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; }
+        .dp-weekday { text-align:center; font-size:11px; font-weight:700; color:var(--texto-secundario); padding:4px 0 8px; text-transform:uppercase; }
+        .dp-day { text-align:center; padding:0; aspect-ratio:1; display:flex; align-items:center; justify-content:center; border-radius:8px; cursor:pointer; font-size:13px; font-weight:500; transition:all .12s; border:1.5px solid transparent; }
+        .dp-day:hover { background:rgba(255,255,255,.07); }
+        .dp-day.dp-empty { pointer-events:none; }
+        .dp-day.dp-today { border-color:var(--cor-botoes); color:var(--cor-botoes); font-weight:700; }
+        .dp-day.dp-selected { background:var(--cor-botoes); color:#111; font-weight:700; border-color:var(--cor-botoes); }
+        .dp-day.dp-selected:hover { opacity:.9; }
+        .dp-day.dp-other-month { color:rgba(255,255,255,.2); }
+        .dp-footer { display:flex; justify-content:space-between; align-items:center; margin-top:12px; padding-top:12px; border-top:1px solid var(--bordas); }
+        .dp-today-btn { background:none; border:none; color:var(--cor-botoes); font-size:13px; font-weight:600; cursor:pointer; padding:4px 8px; border-radius:4px; }
+        .dp-today-btn:hover { background:rgba(212,175,55,.1); }
+        .dp-clear-btn { background:none; border:none; color:var(--texto-secundario); font-size:13px; cursor:pointer; padding:4px 8px; border-radius:4px; }
+        .dp-clear-btn:hover { color:var(--texto-principal); }
+    </style>
+</head>
+<body>
+
+<div class="toast-notification" id="toastMsg">Alterações salvas com sucesso.</div>
+
+<header class="main-header">
+    <div class="brand-area">
+        <div id="headerLogoContainer"></div>
+        <h1 class="brand-name" id="txtLogoTexto">Agenda <span>Audaz</span></h1>
+    </div>
+    <div class="nav-actions">
+        <button class="btn-outline" onclick="alternarFluxoPrincipal('publico')"><i data-lucide="users"></i> Link do Corretor</button>
+        <button class="btn-custom" id="btnAdminAccess" onclick="verificarLoginAdministrativo()"><i data-lucide="lock"></i> Painel do Proprietário</button>
+    </div>
+</header>
+
+<main class="app-container">
+
+    <section id="sectionPublica" class="view-section active">
+        <div class="public-badge">
+            <span><i data-lucide="globe" style="vertical-align:middle;margin-right:5px;"></i> <strong>Link Geral Corporativo:</strong> Registro e consulta de visitas sincronizadas online em tempo real.</span>
+            <button class="btn-custom" onclick="solicitarAberturaCriacaoVisita()">+ Adicionar Visita</button>
+        </div>
+        <div class="agenda-controls">
+            <div class="controls-left">
+                <h2 class="period-title" id="txtPeriodo">Maio de 2026</h2>
+                <button class="btn-outline" onclick="definirDataFocoHoje()">Hoje</button>
+                <div>
+                    <button class="btn-outline" onclick="navegarEntrePeriodos(-1)">◀</button>
+                    <button class="btn-outline" onclick="navegarEntrePeriodos(1)">▶</button>
+                </div>
+            </div>
+            <div class="filters-group">
+                <select class="select-filter" id="filtroCorretor" onchange="dispararFiltrosCalendario()"></select>
+                <select class="select-filter" id="filtroStatus" onchange="dispararFiltrosCalendario()">
+                    <option value="todos">Todos os Status</option>
+                    <option value="agendada">🟡 Agendada</option>
+                    <option value="compareceu">🟢 Compareceu</option>
+                    <option value="nao_compareceu">🔴 Não Compareceu</option>
+                    <option value="reagendada">🔵 Reagendada</option>
+                    <option value="cancelada">⚫ Cancelada</option>
+                </select>
+            </div>
+            <div class="view-switcher">
+                <button class="btn-view" id="btnViewdia" onclick="mudarModoEscopoCalendario('dia')">Dia</button>
+                <button class="btn-view" id="btnViewsemana" onclick="mudarModoEscopoCalendario('semana')">Semana</button>
+                <button class="btn-view active" id="btnViewmes" onclick="mudarModoEscopoCalendario('mes')">Mês</button>
+            </div>
+        </div>
+        <div class="calendar-wrapper" id="calendarioTarget"></div>
+    </section>
+
+    <section id="sectionAdmin" class="view-section">
+        <div class="public-badge" style="border-color:rgba(255,255,255,.1);">
+            <span><i data-lucide="sliders" style="vertical-align:middle;margin-right:5px;"></i> <strong>Ambiente Gerencial Controlado</strong></span>
+            <button class="btn-outline" style="color:#E74C3C;border-color:rgba(231,76,60,.3);" onclick="encerrarSessaoAdmin()">Sair do Painel</button>
+        </div>
+
+        <div class="kpi-container">
+            <div class="kpi-card"><div class="kpi-label">Total de Visitas</div><div class="kpi-value" id="kpiTotal">0</div></div>
+            <div class="kpi-card"><div class="kpi-label">Comparecimentos</div><div class="kpi-value" style="color:var(--st-compareceu)" id="kpiCompareceu">0</div></div>
+            <div class="kpi-card"><div class="kpi-label">Faltas</div><div class="kpi-value" style="color:var(--st-nao-comp)" id="kpiFaltas">0</div></div>
+            <div class="kpi-card"><div class="kpi-label">Taxa Comparecimento</div><div class="kpi-value" id="kpiTaxaComp">0%</div></div>
+            <div class="kpi-card"><div class="kpi-label">Taxa de Ausência</div><div class="kpi-value" id="kpiTaxaAus">0%</div></div>
+        </div>
+
+        <div class="admin-grid">
+            <aside class="sidebar-admin">
+                <div class="sidebar-brand-box" id="sidebarLogoContainer"></div>
+                <button class="admin-menu-btn active" id="btnMenuDash" onclick="navegarSubPainelAdmin('dash')"><i data-lucide="bar-chart-3"></i> Dashboard</button>
+                <button class="admin-menu-btn" id="btnMenuCorretores" onclick="navegarSubPainelAdmin('corretores')"><i data-lucide="award"></i> Performance Equipe</button>
+                <button class="admin-menu-btn" id="btnMenuCampos" onclick="navegarSubPainelAdmin('campos')"><i data-lucide="list-plus"></i> Campos da Visita</button>
+                <button class="admin-menu-btn" id="btnMenuExibicao" onclick="navegarSubPainelAdmin('exibicao')"><i data-lucide="layout-panel-left"></i> Exibição</button>
+                <button class="admin-menu-btn" id="btnMenuConfig" onclick="navegarSubPainelAdmin('config')"><i data-lucide="palette"></i> Aparência & Configs</button>
+            </aside>
+
+            <section class="admin-content-render">
+
+                <!-- DASHBOARD -->
+                <div id="subAbaDash" class="admin-sub-view" style="display:block;">
+                    <div class="agenda-controls" style="background:var(--bg-card);padding:15px;">
+                        <div class="controls-left">
+                            <span style="font-weight:600;font-size:14px;">Filtrar Dados Globais:</span>
+                            <select class="select-filter" id="filtroDataAdmin" onchange="reprocessarMetricasDashboard()">
+                                <option value="hoje">Hoje</option>
+                                <option value="semana">Esta Semana</option>
+                                <option value="mes" selected>Este Mês</option>
+                                <option value="ano">Este Ano</option>
+                                <option value="todos">Todo o Histórico</option>
+                            </select>
+                        </div>
+                        <div class="filters-group">
+                            <button class="btn-outline" onclick="gerarExportacaoPlanilhaExcel()"><i data-lucide="file-spreadsheet"></i> Exportar Excel</button>
+                            <button class="btn-outline" onclick="gerarExportacaoDocumentoPDF()"><i data-lucide="file-text"></i> Exportar PDF</button>
+                        </div>
+                    </div>
+                    <div class="dashboard-row">
+                        <div class="data-table-box">
+                            <div class="table-title">Histórico Consolidado de Agendamentos</div>
+                            <div style="overflow-x:auto;">
+                                <table class="crm-table">
+                                    <thead id="tableVisitasCabecalho"></thead>
+                                    <tbody id="tableVisitasCorpo"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                        <div class="data-table-box">
+                            <div class="table-title">🏆 Ranking da Equipe</div>
+                            <table class="crm-table">
+                                <thead><tr><th>Classificação</th><th>Visitas Completas</th></tr></thead>
+                                <tbody id="tableRankingCorpo"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CORRETORES -->
+                <div id="subAbaCorretores" class="admin-sub-view" style="display:none;">
+                    <div class="data-table-box">
+                        <div class="table-title">
+                            <span>Profissionais Cadastrados</span>
+                            <button class="btn-custom" onclick="chamarModalNovoCorretor()"><i data-lucide="user-plus"></i> Novo Corretor</button>
+                        </div>
+                        <table class="crm-table">
+                            <thead><tr><th>ID</th><th>Nome</th><th>Status</th><th>Ações</th></tr></thead>
+                            <tbody id="tableCorretoresCorpo"></tbody>
+                        </table>
+                    </div>
+                    <div class="data-table-box" id="painelAnaliseIndividual" style="display:none;border-top:3px solid var(--cor-botoes);">
+                        <div class="table-title" id="tituloAnaliseIndividual">Métricas Detalhadas</div>
+                        <div class="kpi-container" style="margin-bottom:0;">
+                            <div class="kpi-card" style="background:rgba(0,0,0,.1);"><div class="kpi-label">Cadastradas</div><div class="kpi-value" id="indTotal">0</div></div>
+                            <div class="kpi-card" style="background:rgba(0,0,0,.1);"><div class="kpi-label">Compareceu</div><div class="kpi-value" style="color:var(--st-compareceu)" id="indComp">0</div></div>
+                            <div class="kpi-card" style="background:rgba(0,0,0,.1);"><div class="kpi-label">Faltas</div><div class="kpi-value" style="color:var(--st-nao-comp)" id="indFaltas">0</div></div>
+                            <div class="kpi-card" style="background:rgba(0,0,0,.1);"><div class="kpi-label">% Comp.</div><div class="kpi-value" id="indTaxaComp">0%</div></div>
+                            <div class="kpi-card" style="background:rgba(0,0,0,.1);"><div class="kpi-label">% Ausência</div><div class="kpi-value" id="indTaxaAus">0%</div></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CAMPOS DA VISITA -->
+                <div id="subAbaCampos" class="admin-sub-view" style="display:none;">
+                    <div class="data-table-box">
+                        <div class="table-title">
+                            <span>Campos do Formulário de Visita</span>
+                            <button class="btn-custom" onclick="abrirModalEditarCampo(null)"><i data-lucide="plus"></i> Novo Campo</button>
+                        </div>
+                        <p style="color:var(--texto-secundario);font-size:13px;margin-bottom:16px;">Arraste para reordenar. Os campos marcados como "Visível" aparecerão no formulário dos corretores.</p>
+                        <div class="campo-list" id="camposListContainer"></div>
+                    </div>
+                </div>
+
+                <!-- EXIBIÇÃO DOS AGENDAMENTOS -->
+                <div id="subAbaExibicao" class="admin-sub-view" style="display:none;">
+                    <div class="data-table-box">
+                        <div class="table-title">Configuração de Exibição dos Agendamentos</div>
+                        <p style="color:var(--texto-secundario);font-size:13px;margin-bottom:20px;">Configure quais informações aparecem em cada visualização. Arraste para reordenar, use os botões ← → para mover entre "disponível" e "exibido".</p>
+
+                        <div class="exib-tabs">
+                            <button class="exib-tab active" onclick="trocarAbaExibicao('calendario')">📅 Calendário</button>
+                            <button class="exib-tab" onclick="trocarAbaExibicao('card')">🃏 Cards</button>
+                            <button class="exib-tab" onclick="trocarAbaExibicao('lista')">📋 Lista</button>
+                            <button class="exib-tab" onclick="trocarAbaExibicao('relatorio')">📊 Relatório</button>
+                        </div>
+
+                        <div id="exibPanelCalendario" class="exib-panel active">
+                            <div class="exib-col-layout" id="exibLayoutCalendario"></div>
+                        </div>
+                        <div id="exibPanelCard" class="exib-panel">
+                            <div class="exib-col-layout" id="exibLayoutCard"></div>
+                        </div>
+                        <div id="exibPanelLista" class="exib-panel">
+                            <div class="exib-col-layout" id="exibLayoutLista"></div>
+                        </div>
+                        <div id="exibPanelRelatorio" class="exib-panel">
+                            <div class="exib-col-layout" id="exibLayoutRelatorio"></div>
+                        </div>
+
+                        <div style="margin-top:30px;padding-top:20px;border-top:1px solid var(--bordas);">
+                            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;">
+                                <div>
+                                    <label class="form-group" style="display:block;">
+                                        <span style="font-size:12px;color:var(--texto-secundario);font-weight:600;text-transform:uppercase;display:block;margin-bottom:8px;">Tamanho dos Cards no Calendário</span>
+                                        <div class="card-size-selector">
+                                            <div class="card-size-opt" id="sizeOptPequeno" onclick="selecionarTamanhoCard('pequeno')"><b>P</b><span>Pequeno</span></div>
+                                            <div class="card-size-opt selected" id="sizeOptMedio" onclick="selecionarTamanhoCard('medio')"><b>M</b><span>Médio</span></div>
+                                            <div class="card-size-opt" id="sizeOptGrande" onclick="selecionarTamanhoCard('grande')"><b>G</b><span>Grande</span></div>
+                                        </div>
+                                    </label>
+                                </div>
+                                <div>
+                                    <div class="form-group">
+                                        <label>Máx. Linhas no Calendário</label>
+                                        <input type="number" class="form-control" id="cfgLinhasCalendario" min="1" max="5" value="2" style="max-width:100px;">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top:20px;display:flex;justify-content:flex-end;">
+                            <button class="btn-custom" style="padding:12px 35px;" onclick="salvarExibicaoConfig()"><i data-lucide="check"></i> Salvar Configurações de Exibição</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- APARÊNCIA -->
+                <div id="subAbaConfig" class="admin-sub-view" style="display:none;">
+                    <div class="data-table-box">
+                        <div class="table-title">Configurações de Aparência</div>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;">
+                            <div>
+                                <div class="form-group">
+                                    <label>Nome do Sistema / Incorporadora</label>
+                                    <input type="text" class="form-control" id="cfgNomeEmpresa">
+                                </div>
+                                <div class="form-group">
+                                    <label>Senha de Acesso Administrativo</label>
+                                    <input type="password" class="form-control" id="cfgSenhaAdmin">
+                                </div>
+                                <div class="form-group">
+                                    <label>Substituir Logo Institucional (PNG / JPG)</label>
+                                    <input type="file" class="form-control" accept="image/png,image/jpeg" onchange="processarLeituraBinariaLogo(this)">
+                                    <div style="margin-top:15px;">
+                                        <p style="font-size:11px;color:var(--texto-secundario);margin-bottom:5px;">Visualização prévia:</p>
+                                        <img id="imgPreviewConfig" class="logo-preview-img" style="background:rgba(0,0,0,.4);padding:8px;border-radius:6px;display:none;">
+                                    </div>
+                                </div>
+                                <div class="form-group" style="margin-top:25px;display:flex;gap:10px;">
+                                    <button class="btn-outline" onclick="forçarConfiguracaoTemaBase('light')">☀️ Modo Claro</button>
+                                    <button class="btn-outline" onclick="forçarConfiguracaoTemaBase('dark')">🌙 Modo Escuro</button>
+                                </div>
+                            </div>
+                            <div>
+                                <label style="display:block;font-size:12px;color:var(--texto-secundario);margin-bottom:10px;font-weight:600;">Paleta Cromática</label>
+                                <div class="color-picker-grid">
+                                    <div class="color-picker-item"><span>Fundo Principal</span><input type="color" id="cpBgPrincipal"></div>
+                                    <div class="color-picker-item"><span>Cards</span><input type="color" id="cpBgCard"></div>
+                                    <div class="color-picker-item"><span>Destaques</span><input type="color" id="cpBotoes"></div>
+                                    <div class="color-picker-item"><span>Texto Principal</span><input type="color" id="cpTextoPrincipal"></div>
+                                    <div class="color-picker-item"><span>Texto Secundário</span><input type="color" id="cpTextoSecundario"></div>
+                                    <div class="color-picker-item"><span>Menu Lateral</span><input type="color" id="cpMenuLateral"></div>
+                                    <div class="color-picker-item"><span>Calendário</span><input type="color" id="cpCalendario"></div>
+                                </div>
+                                <label style="display:block;font-size:12px;color:var(--texto-secundario);margin-top:20px;margin-bottom:10px;font-weight:600;">Cores por Status</label>
+                                <div class="color-picker-grid">
+                                    <div class="color-picker-item"><span>🟡 Agendada</span><input type="color" id="cpStAgendada"></div>
+                                    <div class="color-picker-item"><span>🟢 Compareceu</span><input type="color" id="cpStCompareceu"></div>
+                                    <div class="color-picker-item"><span>🔴 Não Comp.</span><input type="color" id="cpStNaoComp"></div>
+                                    <div class="color-picker-item"><span>🔵 Reagendada</span><input type="color" id="cpStReagendada"></div>
+                                    <div class="color-picker-item"><span>⚫ Cancelada</span><input type="color" id="cpStCancelada"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div style="margin-top:35px;padding-top:20px;border-top:1px solid var(--bordas);display:flex;justify-content:space-between;">
+                            <button class="btn-outline" style="color:#E74C3C;border-color:rgba(231,76,60,.2);" onclick="reverterCoresParaOriginaisFabrica()">Restaurar Fábrica</button>
+                            <button class="btn-custom" style="padding:12px 35px;" onclick="enviarConfiguracoesAparenciaSupabase()"><i data-lucide="check"></i> Salvar Alterações</button>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+        </div>
+    </section>
+
+</main>
+
+<!-- MODAL VISITA (dinâmico) -->
+<div class="modal-overlay" id="modalVisita">
+    <div class="modal-card">
+        <button class="btn-close-modal" onclick="fecharModaisAtivos()">&times;</button>
+        <h3 id="modalVisitaTitulo" style="margin-bottom:20px;">Agendar Nova Visita</h3>
+        <input type="hidden" id="formVisitaId">
+        <div id="containerCamposDinamicos"></div>
+        <div class="modal-footer">
+            <button class="btn-outline" onclick="fecharModaisAtivos()">Cancelar</button>
+            <button class="btn-custom" onclick="coletarESalvarFormularioVisita()">Registrar na Agenda</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL CORRETOR -->
+<div class="modal-overlay" id="modalCorretor">
+    <div class="modal-card">
+        <button class="btn-close-modal" onclick="fecharModaisAtivos()">&times;</button>
+        <h3 style="margin-bottom:20px;">Inserir Profissional na Equipe</h3>
+        <div class="form-group">
+            <label>Nome Completo do Corretor</label>
+            <input type="text" class="form-control" id="cNome" placeholder="Ex: Roberto Alencar">
+        </div>
+        <div class="modal-footer">
+            <button class="btn-outline" onclick="fecharModaisAtivos()">Cancelar</button>
+            <button class="btn-custom" onclick="gravarNovoCorretorSupabase()">Cadastrar</button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL CAMPO -->
+<div class="modal-overlay" id="modalCampo">
+    <div class="modal-card modal-lg">
+        <button class="btn-close-modal" onclick="fecharModaisAtivos()">&times;</button>
+        <h3 id="modalCampoTitulo" style="margin-bottom:24px;">Novo Campo</h3>
+        <input type="hidden" id="campoEditId">
+
+        <div class="form-group">
+            <label>Nome / Label do Campo *</label>
+            <input type="text" class="form-control" id="campoLabel" placeholder="Ex: Canal de Origem, CPF, Faixa de Renda...">
+        </div>
+
+        <div class="form-group">
+            <label>Tipo do Campo</label>
+            <div class="tipo-grid" id="tipoGrid">
+                <div class="tipo-btn selected" data-tipo="text_short" onclick="selecionarTipoCampo('text_short')"><span>✏️</span>Texto Curto</div>
+                <div class="tipo-btn" data-tipo="text_long" onclick="selecionarTipoCampo('text_long')"><span>📝</span>Texto Longo</div>
+                <div class="tipo-btn" data-tipo="number" onclick="selecionarTipoCampo('number')"><span>#️⃣</span>Número</div>
+                <div class="tipo-btn" data-tipo="currency" onclick="selecionarTipoCampo('currency')"><span>💰</span>Moeda</div>
+                <div class="tipo-btn" data-tipo="date" onclick="selecionarTipoCampo('date')"><span>📅</span>Data</div>
+                <div class="tipo-btn" data-tipo="time" onclick="selecionarTipoCampo('time')"><span>🕐</span>Hora</div>
+                <div class="tipo-btn" data-tipo="phone" onclick="selecionarTipoCampo('phone')"><span>📞</span>Telefone</div>
+                <div class="tipo-btn" data-tipo="email" onclick="selecionarTipoCampo('email')"><span>📧</span>E-mail</div>
+                <div class="tipo-btn" data-tipo="select" onclick="selecionarTipoCampo('select')"><span>🔽</span>Lista Suspensa</div>
+                <div class="tipo-btn" data-tipo="multi" onclick="selecionarTipoCampo('multi')"><span>☑️</span>Múltipla Escolha</div>
+                <div class="tipo-btn" data-tipo="checkbox" onclick="selecionarTipoCampo('checkbox')"><span>✅</span>Caixa de Seleção</div>
+            </div>
+        </div>
+
+        <div class="form-group" id="grupoOpcoesCampo" style="display:none;">
+            <label>Opções (uma por linha) *</label>
+            <textarea class="form-control" id="campoOpcoes" rows="4" placeholder="Opção 1&#10;Opção 2&#10;Opção 3"></textarea>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:8px;">
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--texto-principal);">
+                <input type="checkbox" id="campoObrigatorio" style="width:18px;height:18px;accent-color:var(--cor-botoes);">
+                <span>Campo obrigatório</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;color:var(--texto-principal);">
+                <input type="checkbox" id="campoVisivelCorretor" checked style="width:18px;height:18px;accent-color:var(--cor-botoes);">
+                <span>Visível para corretores</span>
+            </label>
+        </div>
+
+        <div class="modal-footer">
+            <button class="btn-outline" onclick="fecharModaisAtivos()">Cancelar</button>
+            <button class="btn-custom" onclick="salvarCampoSupabase()"><i data-lucide="save"></i> Salvar Campo</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const SUPABASE_URL = "https://eqoyiljpukmdoynmmtbw.supabase.co";
+    const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVxb3lpbGpwdWttZG95bm1tdGJ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAyMzQ0ODgsImV4cCI6MjA5NTgxMDQ4OH0.8Fpj7kIIIs9XIqt4zai069J0uoYA14bPuYwH1bFUylA";
+    const _supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    let dataFoco = new Date();
+    let visaoAtiva = 'mes';
+    let adminAutenticado = false;
+    let memCacheConfig = null;
+    let base64LogoSalva = null;
+    let dragSrcEl = null;
+    let tipoSelecionadoCampo = 'text_short';
+
+    let corretoresCache = [];
+    let visitasCache = [];
+    let camposCache = [];
+    let exibicaoConfig = null;
+
+    const mesesNomes = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+    const diasSemanaNomes = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
+
+    const TIPOS_LABEL = {
+        text_short:'Texto Curto', text_long:'Texto Longo', number:'Número', currency:'Moeda',
+        date:'Data', time:'Hora', phone:'Telefone', email:'E-mail',
+        select:'Lista Suspensa', multi:'Múltipla Escolha', checkbox:'Caixa de Seleção', corretor:'Corretor'
+    };
+
+    const CAMPOS_SISTEMA = [
+        { key:'horario', label:'Horário' },
+        { key:'cliente', label:'Nome do Cliente' },
+        { key:'corretor', label:'Corretor' },
+        { key:'data', label:'Data' },
+        { key:'telefone', label:'Telefone' },
+        { key:'empreendimento', label:'Empreendimento' },
+        { key:'local', label:'Local' },
+        { key:'observacoes', label:'Observações' },
+        { key:'status', label:'Status' },
+    ];
+
+    const coresOriginaisFabrica = {
+        nomeEmpresa:"Agenda Audaz", senhaAdmin:"admin123",
+        bgPrincipal:"#0A0A0A", bgCard:"#141414", botoes:"#D4AF37",
+        textoPrincipal:"#F5F5F7", textoSecundario:"#A0A0A5",
+        menuLateral:"#111111", calendario:"#18181C",
+        stAgendada:"#FFD700", stCompareceu:"#2ECC71",
+        stNaoComp:"#E74C3C", stReagendada:"#3498DB", stCancelada:"#95A5A6"
+    };
+
+    document.addEventListener("DOMContentLoaded", async () => {
+        lucide.createIcons();
+        await Promise.all([
+            carregarConfiguracoesPlataforma(),
+            sincronizarTabelasSupabase(),
+            carregarCamposConfig(),
+            carregarExibicaoConfig()
+        ]);
+        configurarRealtimeSupabase();
+    });
+
+    // ===== TOAST =====
+    function exibirAlertaSucessoToast(msg) {
+        const toast = document.getElementById("toastMsg");
+        toast.textContent = msg || "Alterações salvas com sucesso.";
+        toast.classList.add("active");
+        setTimeout(() => toast.classList.remove("active"), 3000);
+    }
+
+    // ===== REALTIME =====
+    function configurarRealtimeSupabase() {
+        _supabase.channel('mudancas_reais')
+            .on('postgres_changes', { event:'*', filter:'id=eq.1', schema:'public', table:'configuracoes' }, () => carregarConfiguracoesPlataforma())
+            .on('postgres_changes', { event:'*', schema:'public', table:'corretores' }, () => sincronizarTabelasSupabase())
+            .on('postgres_changes', { event:'*', schema:'public', table:'visitas' }, () => sincronizarTabelasSupabase())
+            .on('postgres_changes', { event:'*', schema:'public', table:'campos_visita' }, () => carregarCamposConfig())
+            .on('postgres_changes', { event:'*', schema:'public', table:'config_exibicao' }, () => carregarExibicaoConfig())
+            .subscribe();
+    }
+
+    // ===== SYNC =====
+    async function sincronizarTabelasSupabase() {
+        const [resCorr, resVis] = await Promise.all([
+            _supabase.from('corretores').select('*').order('nome'),
+            _supabase.from('visitas').select('*')
+        ]);
+        if (!resCorr.error) corretoresCache = resCorr.data;
+        if (!resVis.error) visitasCache = resVis.data;
+
+        atualizarSeletoresInterfaceFiltros();
+        renderizarComponenteCalendarioBase();
+
+        if (document.getElementById('sectionAdmin').classList.contains('active')) {
+            reprocessarMetricasDashboard();
+            renderizarGerenciamentoCorretores();
+        }
+    }
+
+    // ===== CONFIGS PLATAFORMA =====
+    async function carregarConfiguracoesPlataforma() {
+        const { data, error } = await _supabase.from('configuracoes').select('*').eq('id', 1).single();
+        if (error || !data) return;
+        memCacheConfig = data;
+        base64LogoSalva = data.logo_base64;
+
+        document.getElementById("cfgNomeEmpresa").value = data.nome_empresa || '';
+        document.getElementById("cfgSenhaAdmin").value = data.senha_admin || '';
+        document.getElementById("cpBgPrincipal").value = data.co_bg_principal || '#0A0A0A';
+        document.getElementById("cpBgCard").value = data.co_bg_card || '#141414';
+        document.getElementById("cpBotoes").value = data.co_botoes || '#D4AF37';
+        document.getElementById("cpTextoPrincipal").value = data.co_texto_principal || '#F5F5F7';
+        document.getElementById("cpTextoSecundario").value = data.co_texto_secundario || '#A0A0A5';
+        document.getElementById("cpMenuLateral").value = data.co_menu_lateral || '#111111';
+        document.getElementById("cpCalendario").value = data.co_calendario || '#18181C';
+        document.getElementById("cpStAgendada").value = data.co_st_agendada || '#FFD700';
+        document.getElementById("cpStCompareceu").value = data.co_st_compareceu || '#2ECC71';
+        document.getElementById("cpStNaoComp").value = data.co_st_nao_comp || '#E74C3C';
+        document.getElementById("cpStReagendada").value = data.co_st_reagendada || '#3498DB';
+        document.getElementById("cpStCancelada").value = data.co_st_cancelada || '#95A5A6';
+
+        const root = document.documentElement;
+        root.style.setProperty('--bg-principal', data.co_bg_principal);
+        root.style.setProperty('--bg-card', data.co_bg_card);
+        root.style.setProperty('--cor-botoes', data.co_botoes);
+        root.style.setProperty('--texto-principal', data.co_texto_principal);
+        root.style.setProperty('--texto-secundario', data.co_texto_secundario);
+        root.style.setProperty('--cor-menu-lateral', data.co_menu_lateral);
+        root.style.setProperty('--cor-calendario', data.co_calendario);
+        root.style.setProperty('--st-agendada', data.co_st_agendada);
+        root.style.setProperty('--st-compareceu', data.co_st_compareceu);
+        root.style.setProperty('--st-nao-comp', data.co_st_nao_comp);
+        root.style.setProperty('--st-reagendada', data.co_st_reagendada);
+        root.style.setProperty('--st-cancelada', data.co_st_cancelada);
+
+        document.getElementById("txtLogoTexto").innerHTML = `${data.nome_empresa || 'Agenda'} <span>Audaz</span>`;
+        const htmlLogo = base64LogoSalva
+            ? `<img src="${base64LogoSalva}" class="logo-preview-img" alt="Logo">`
+            : `<div class="logo-fallback">A</div>`;
+        document.getElementById("headerLogoContainer").innerHTML = htmlLogo;
+        document.getElementById("sidebarLogoContainer").innerHTML = htmlLogo;
+        if (base64LogoSalva) {
+            const p = document.getElementById("imgPreviewConfig");
+            p.src = base64LogoSalva; p.style.display = "block";
+        }
+    }
+
+    async function enviarConfiguracoesAparenciaSupabase() {
+        const params = {
+            nome_empresa: document.getElementById("cfgNomeEmpresa").value,
+            senha_admin: document.getElementById("cfgSenhaAdmin").value,
+            logo_base64: base64LogoSalva,
+            co_bg_principal: document.getElementById("cpBgPrincipal").value,
+            co_bg_card: document.getElementById("cpBgCard").value,
+            co_botoes: document.getElementById("cpBotoes").value,
+            co_texto_principal: document.getElementById("cpTextoPrincipal").value,
+            co_texto_secundario: document.getElementById("cpTextoSecundario").value,
+            co_menu_lateral: document.getElementById("cpMenuLateral").value,
+            co_calendario: document.getElementById("cpCalendario").value,
+            co_st_agendada: document.getElementById("cpStAgendada").value,
+            co_st_compareceu: document.getElementById("cpStCompareceu").value,
+            co_st_nao_comp: document.getElementById("cpStNaoComp").value,
+            co_st_reagendada: document.getElementById("cpStReagendada").value,
+            co_st_cancelada: document.getElementById("cpStCancelada").value
+        };
+        await _supabase.from('configuracoes').update(params).eq('id', 1);
+        exibirAlertaSucessoToast();
+        await carregarConfiguracoesPlataforma();
+    }
+
+    async function reverterCoresParaOriginaisFabrica() {
+        if (!confirm("Deseja reverter todas as customizações estéticas?")) return;
+        const p = coresOriginaisFabrica;
+        await _supabase.from('configuracoes').update({
+            nome_empresa: p.nomeEmpresa, senha_admin: p.senhaAdmin, logo_base64: null,
+            co_bg_principal: p.bgPrincipal, co_bg_card: p.bgCard, co_botoes: p.botoes,
+            co_texto_principal: p.textoPrincipal, co_texto_secundario: p.textoSecundario,
+            co_menu_lateral: p.menuLateral, co_calendario: p.calendario,
+            co_st_agendada: p.stAgendada, co_st_compareceu: p.stCompareceu,
+            co_st_nao_comp: p.stNaoComp, co_st_reagendada: p.stReagendada, co_st_cancelada: p.stCancelada
+        }).eq('id', 1);
+        base64LogoSalva = null;
+        document.getElementById("imgPreviewConfig").style.display = "none";
+        exibirAlertaSucessoToast();
+        await carregarConfiguracoesPlataforma();
+    }
+
+    function processarLeituraBinariaLogo(input) {
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            reader.onload = e => {
+                base64LogoSalva = e.target.result;
+                const p = document.getElementById("imgPreviewConfig");
+                p.src = base64LogoSalva; p.style.display = "block";
+            };
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+
+    function forçarConfiguracaoTemaBase(tema) {
+        if (tema === 'light') {
+            document.getElementById("cpBgPrincipal").value = "#F4F5F7";
+            document.getElementById("cpBgCard").value = "#FFFFFF";
+            document.getElementById("cpBotoes").value = "#111111";
+            document.getElementById("cpTextoPrincipal").value = "#111111";
+            document.getElementById("cpTextoSecundario").value = "#5E6C84";
+            document.getElementById("cpMenuLateral").value = "#FFFFFF";
+            document.getElementById("cpCalendario").value = "#FFFFFF";
+        } else {
+            document.getElementById("cpBgPrincipal").value = "#0A0A0A";
+            document.getElementById("cpBgCard").value = "#141414";
+            document.getElementById("cpBotoes").value = "#D4AF37";
+            document.getElementById("cpTextoPrincipal").value = "#F5F5F7";
+            document.getElementById("cpTextoSecundario").value = "#A0A0A5";
+            document.getElementById("cpMenuLateral").value = "#111111";
+            document.getElementById("cpCalendario").value = "#18181C";
+        }
+    }
+
+    // ===== SESSÃO ADMIN =====
+    function verificarLoginAdministrativo() {
+        if (adminAutenticado) { alternarFluxoPrincipal('admin'); return; }
+        const senha = prompt("Digite o código de acesso do Proprietário:");
+        const correta = memCacheConfig ? memCacheConfig.senha_admin : "admin123";
+        if (senha === correta) { adminAutenticado = true; alternarFluxoPrincipal('admin'); }
+        else if (senha !== null) alert("Acesso negado. Senha incorreta.");
+    }
+    function encerrarSessaoAdmin() { adminAutenticado = false; alternarFluxoPrincipal('publico'); }
+
+    function alternarFluxoPrincipal(fluxo) {
+        document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
+        if (fluxo === 'admin') {
+            document.getElementById('sectionAdmin').classList.add('active');
+            navegarSubPainelAdmin('dash');
+        } else {
+            document.getElementById('sectionPublica').classList.add('active');
+            renderizarComponenteCalendarioBase();
+        }
+    }
+
+    function navegarSubPainelAdmin(subAba) {
+        document.querySelectorAll('.admin-sub-view').forEach(v => v.style.display = 'none');
+        document.querySelectorAll('.admin-menu-btn').forEach(b => b.classList.remove('active'));
+        const nomeCap = subAba.charAt(0).toUpperCase() + subAba.slice(1);
+        const el = document.getElementById(`subAba${nomeCap}`);
+        const btn = document.getElementById(`btnMenu${nomeCap}`);
+        if (el) el.style.display = 'block';
+        if (btn) btn.classList.add('active');
+        if (subAba === 'dash') reprocessarMetricasDashboard();
+        if (subAba === 'corretores') renderizarGerenciamentoCorretores();
+        if (subAba === 'campos') renderizarSubAbaCampos();
+        if (subAba === 'exibicao') renderizarSubAbaExibicao();
+    }
+
+    // ===== CALENDÁRIO =====
+    function mudarModoEscopoCalendario(tipo) {
+        visaoAtiva = tipo;
+        document.querySelectorAll(".btn-view").forEach(b => b.classList.remove("active"));
+        document.getElementById(`btnView${tipo}`).classList.add("active");
+        renderizarComponenteCalendarioBase();
+    }
+    function navegarEntrePeriodos(dir) {
+        if (visaoAtiva === 'mes') {
+            // Fix: sempre navegar pelo dia 1 para evitar overflow (ex: 31/mai → set mês → julho)
+            dataFoco = new Date(dataFoco.getFullYear(), dataFoco.getMonth() + dir, 1);
+        } else if (visaoAtiva === 'semana') {
+            dataFoco = new Date(dataFoco.getFullYear(), dataFoco.getMonth(), dataFoco.getDate() + dir * 7);
+        } else {
+            dataFoco = new Date(dataFoco.getFullYear(), dataFoco.getMonth(), dataFoco.getDate() + dir);
+        }
+        renderizarComponenteCalendarioBase();
+    }
+    function definirDataFocoHoje() { dataFoco = new Date(); renderizarComponenteCalendarioBase(); }
+    function dispararFiltrosCalendario() { renderizarComponenteCalendarioBase(); }
+    function isoStr(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+
+    function getValorExibicao(visita, key) {
+        const mapa = {
+            'cliente': visita.cliente || '',
+            'telefone': visita.telefone || '',
+            'horario': visita.horario ? visita.horario.substring(0,5) : '',
+            'data': visita.data || '',
+            'local': visita.local || '',
+            'empreendimento': visita.empreendimento || '',
+            'observacoes': visita.observacoes || '',
+            'status': visita.status || '',
+            'corretor': corretoresCache.find(c => c.id === visita.corretor_id)?.nome || '',
+        };
+        if (key in mapa) return mapa[key];
+        // campo customizado
+        const campo = camposCache.find(c => String(c.id) === String(key));
+        if (!campo) return '';
+        const val = (visita.dados_extras || {})[String(campo.id)];
+        if (Array.isArray(val)) return val.join(', ');
+        return val !== undefined && val !== null ? String(val) : '';
+    }
+
+    function getLabelExibicao(key) {
+        const s = CAMPOS_SISTEMA.find(c => c.key === key);
+        if (s) return s.label;
+        const c = camposCache.find(c => String(c.id) === String(key));
+        return c ? c.label : key;
+    }
+
+    function montarCardMes(visita) {
+        const cfg = exibicaoConfig || {};
+        const campos = cfg.campos_calendario || ['horario', 'cliente'];
+        const maxLinhas = cfg.linhas_calendario || 2;
+        const tamanho = cfg.card_tamanho || 'medio';
+
+        const hora = visita.horario ? visita.horario.substring(0,5) : '';
+
+        // Pega todos os campos exceto horario (que vira o badge)
+        const camposConteudo = campos.filter(k => k !== 'horario');
+        const vals = camposConteudo.map(k => getValorExibicao(visita, k)).filter(Boolean);
+
+        const principal = vals[0] || '';
+        const secundarios = vals.slice(1, maxLinhas).join(' · ');
+
+        const tamanhoClass = tamanho !== 'medio' ? ` card-${tamanho}` : '';
+
+        return `<div class="event-card card-mes st-${visita.status}${tamanhoClass}" onclick="solicitarAberturaEdicaoVisita(${visita.id})">
+            ${hora ? `<div class="ec-hora">${hora}</div>` : ''}
+            ${principal ? `<div class="ec-nome">${principal}</div>` : ''}
+            ${secundarios ? `<div class="ec-sub">${secundarios}</div>` : ''}
+        </div>`;
+    }
+
+    function montarCardSemana(visita) {
+        const cfg = exibicaoConfig || {};
+        const campos = cfg.campos_calendario || ['horario', 'cliente'];
+        const tamanho = cfg.card_tamanho || 'medio';
+
+        const hora = visita.horario ? visita.horario.substring(0,5) : '';
+        const camposConteudo = campos.filter(k => k !== 'horario');
+        const vals = camposConteudo.map(k => getValorExibicao(visita, k)).filter(Boolean);
+
+        const principal = vals[0] || '';
+        const secundario = vals.slice(1, 3).join(' · ');
+        const altura = tamanho === 'pequeno' ? 30 : tamanho === 'grande' ? 72 : 52;
+
+        const h = parseInt(visita.horario.split(":")[0]) - 8;
+        const m = parseInt(visita.horario.split(":")[1] || 0);
+        const top = 55 + (h * 60) + m;
+
+        return { top, altura, html: `
+            <div class="event-card card-semana st-${visita.status}" style="top:${top}px;height:${altura}px;" onclick="solicitarAberturaEdicaoVisita(${visita.id})">
+                <div class="ec-hora-badge">${hora}</div>
+                ${principal ? `<div class="ec-nome">${principal}</div>` : ''}
+                ${secundario ? `<div class="ec-sub">${secundario}</div>` : ''}
+            </div>`
+        };
+    }
+
+    function renderizarComponenteCalendarioBase() {
+        const target = document.getElementById("calendarioTarget");
+        if (!target) return;
+        target.innerHTML = "";
+        const txtPeriodo = document.getElementById("txtPeriodo");
+        const fCorr = document.getElementById("filtroCorretor").value;
+        const fStat = document.getElementById("filtroStatus").value;
+
+        const filtradas = visitasCache.filter(v => {
+            const mC = fCorr === "todos" || String(v.corretor_id) === fCorr;
+            const mS = fStat === "todos" || v.status === fStat;
+            return mC && mS;
+        });
+
+        if (visaoAtiva === 'mes') {
+            txtPeriodo.innerText = `${mesesNomes[dataFoco.getMonth()]} de ${dataFoco.getFullYear()}`;
+            const grid = document.createElement("div");
+            grid.className = "grid-month";
+            diasSemanaNomes.forEach(d => grid.innerHTML += `<div class="month-header-cell">${d}</div>`);
+            const primDia = new Date(dataFoco.getFullYear(), dataFoco.getMonth(), 1).getDay();
+            const totalDias = new Date(dataFoco.getFullYear(), dataFoco.getMonth()+1, 0).getDate();
+            for (let i = 0; i < primDia; i++) grid.innerHTML += `<div class="day-cell empty"></div>`;
+            const agora = new Date();
+            for (let d = 1; d <= totalDias; d++) {
+                const dData = new Date(dataFoco.getFullYear(), dataFoco.getMonth(), d);
+                const iso = isoStr(dData);
+                const ehHoje = d === agora.getDate() && dataFoco.getMonth() === agora.getMonth() && dataFoco.getFullYear() === agora.getFullYear();
+                const cell = document.createElement('div');
+                cell.className = `day-cell${ehHoje ? ' today' : ''}`;
+                cell.dataset.date = iso;
+                cell.innerHTML = `<span class="day-number">${d}</span>`;
+                filtradas.filter(v => v.data === iso)
+                    .sort((a,b) => a.horario > b.horario ? 1 : -1)
+                    .forEach(v => { cell.insertAdjacentHTML('beforeend', montarCardMes(v)); });
+                grid.appendChild(cell);
+            }
+            target.appendChild(grid);
+        } else {
+            const total = visaoAtiva === 'semana' ? 7 : 1;
+            // Fix: criar nova instância com dia explícito para evitar overflow
+            const inicio = new Date(dataFoco.getFullYear(), dataFoco.getMonth(),
+                visaoAtiva === 'semana' ? dataFoco.getDate() - dataFoco.getDay() : dataFoco.getDate());
+            txtPeriodo.innerText = visaoAtiva === 'semana'
+                ? `Semana de ${inicio.getDate()} de ${mesesNomes[inicio.getMonth()]}`
+                : `${dataFoco.getDate()} de ${mesesNomes[dataFoco.getMonth()]} de ${dataFoco.getFullYear()}`;
+            const grid = document.createElement("div");
+            grid.className = visaoAtiva === 'semana' ? "grid-weekly-day" : "grid-single-day";
+            grid.appendChild(gerarGradeHorariosVertical());
+            for (let i = 0; i < total; i++) {
+                const dia = new Date(inicio);
+                if (visaoAtiva === 'semana') dia.setDate(inicio.getDate() + i);
+                const iso = isoStr(dia);
+                const col = document.createElement("div");
+                col.className = "column-day";
+                col.innerHTML = `<div class="column-header"><strong>${diasSemanaNomes[dia.getDay()]}</strong> ${dia.getDate()}</div>`;
+                filtradas.filter(v => v.data === iso)
+                    .sort((a,b) => a.horario > b.horario ? 1 : -1)
+                    .forEach(v => { col.insertAdjacentHTML('beforeend', montarCardSemana(v).html); });
+                grid.appendChild(col);
+            }
+            target.appendChild(grid);
+        }
+    }
+
+    function gerarGradeHorariosVertical() {
+        const col = document.createElement("div");
+        col.className = "time-col";
+        col.innerHTML = `<div class="column-header" style="visibility:hidden">H</div>`;
+        for (let h = 8; h <= 19; h++) col.innerHTML += `<div class="time-slot-label">${String(h).padStart(2,'0')}:00</div>`;
+        return col;
+    }
+
+    // ===== FILTROS =====
+    function atualizarSeletoresInterfaceFiltros() {
+        const fCorr = document.getElementById("filtroCorretor");
+        fCorr.innerHTML = `<option value="todos">Todos os Corretores</option>`;
+        corretoresCache.filter(c => c.status === 'ativo').forEach(c => {
+            fCorr.innerHTML += `<option value="${c.id}">${c.nome}</option>`;
+        });
+    }
+
+    // ===== FORM VISITA DINÂMICO =====
+    function getValorBruto(visita, campo) {
+        if (!visita) return '';
+        if (campo.campo_sistema) {
+            const v = visita[campo.campo_sistema];
+            return v !== null && v !== undefined ? v : '';
+        }
+        const ext = (visita.dados_extras || {})[String(campo.id)];
+        return ext !== undefined ? ext : '';
+    }
+
+    function criarInputCampo(campo, visita) {
+        const val = getValorBruto(visita, campo);
+
+        if (campo.tipo === 'corretor') {
+            const sel = document.createElement('select');
+            sel.className = 'form-control';
+            sel.dataset.campoId = campo.id;
+            sel.dataset.campSistema = 'corretor_id';
+            sel.innerHTML = '<option value="">Selecione...</option>';
+            corretoresCache.filter(c => c.status === 'ativo').forEach(c => {
+                sel.innerHTML += `<option value="${c.id}" ${String(val) === String(c.id) ? 'selected' : ''}>${c.nome}</option>`;
+            });
+            return sel;
+        }
+
+        if (campo.tipo === 'select') {
+            const sel = document.createElement('select');
+            sel.className = 'form-control';
+            sel.dataset.campoId = campo.id;
+            sel.dataset.campSistema = campo.campo_sistema || '';
+            sel.innerHTML = '<option value="">Selecione...</option>';
+            (campo.opcoes || []).forEach(op => {
+                sel.innerHTML += `<option value="${op}" ${val === op ? 'selected' : ''}>${op}</option>`;
+            });
+            return sel;
+        }
+
+        if (campo.tipo === 'multi') {
+            const wrap = document.createElement('div');
+            wrap.className = 'form-multi-opts';
+            wrap.dataset.campoId = campo.id;
+            wrap.dataset.campSistema = campo.campo_sistema || '';
+            wrap.dataset.tipoMulti = '1';
+            const selecionados = Array.isArray(val) ? val : (val ? [val] : []);
+            (campo.opcoes || []).forEach(op => {
+                const lbl = document.createElement('label');
+                const cb = document.createElement('input');
+                cb.type = 'checkbox'; cb.value = op;
+                cb.checked = selecionados.includes(op);
+                lbl.appendChild(cb);
+                lbl.appendChild(document.createTextNode(' ' + op));
+                wrap.appendChild(lbl);
+            });
+            return wrap;
+        }
+
+        if (campo.tipo === 'text_long') {
+            const ta = document.createElement('textarea');
+            ta.className = 'form-control'; ta.rows = 2;
+            ta.dataset.campoId = campo.id;
+            ta.dataset.campSistema = campo.campo_sistema || '';
+            ta.value = val;
+            return ta;
+        }
+
+        if (campo.tipo === 'checkbox') {
+            const wrap = document.createElement('div');
+            wrap.style.display = 'flex'; wrap.style.alignItems = 'center'; wrap.style.gap = '10px';
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.dataset.campoId = campo.id;
+            cb.dataset.campSistema = campo.campo_sistema || '';
+            cb.dataset.tipoCheck = '1';
+            cb.checked = val === true || val === 'true';
+            cb.style.width = '18px'; cb.style.height = '18px';
+            cb.style.accentColor = 'var(--cor-botoes)';
+            wrap.appendChild(cb);
+            return wrap;
+        }
+
+        // date → picker visual
+        if (campo.tipo === 'date') {
+            return criarDatePickerCustom(campo, val);
+        }
+
+        // inputs simples
+        const tipoHTML = {
+            time:'time', number:'number', currency:'number',
+            phone:'tel', email:'email', text_short:'text'
+        };
+        const input = document.createElement('input');
+        input.type = tipoHTML[campo.tipo] || 'text';
+        input.className = 'form-control';
+        input.dataset.campoId = campo.id;
+        input.dataset.campSistema = campo.campo_sistema || '';
+        if (campo.tipo === 'currency') input.step = '0.01';
+        input.value = val;
+        return input;
+    }
+
+    function renderizarFormularioVisitaDinamico(visita) {
+        const container = document.getElementById('containerCamposDinamicos');
+        container.innerHTML = '';
+        const ehEdicao = !!visita;
+        const campos = camposCache.filter(c => c.ativo && c.visivel_corretor);
+
+        // Agrupar data e hora lado a lado (quando ambos existem)
+        const temData = campos.find(c => c.campo_sistema === 'data');
+        const temHora = campos.find(c => c.campo_sistema === 'horario');
+        const renderizados = new Set();
+
+        campos.forEach(campo => {
+            if (renderizados.has(campo.id)) return;
+
+            // Agrupar data+hora
+            if (campo.campo_sistema === 'data' && temHora) {
+                const row = document.createElement('div');
+                row.className = 'form-grid-2';
+                const g1 = document.createElement('div'); g1.className = 'form-group';
+                const l1 = document.createElement('label'); l1.textContent = campo.label + (campo.obrigatorio ? ' *' : '');
+                g1.appendChild(l1); g1.appendChild(criarInputCampo(campo, visita));
+                const g2 = document.createElement('div'); g2.className = 'form-group';
+                const l2 = document.createElement('label'); l2.textContent = temHora.label + (temHora.obrigatorio ? ' *' : '');
+                g2.appendChild(l2); g2.appendChild(criarInputCampo(temHora, visita));
+                row.appendChild(g1); row.appendChild(g2);
+                container.appendChild(row);
+                renderizados.add(campo.id); renderizados.add(temHora.id);
+                return;
+            }
+            if (campo.campo_sistema === 'horario' && renderizados.has(campo.id)) return;
+
+            const grp = document.createElement('div'); grp.className = 'form-group';
+            const lbl = document.createElement('label');
+            lbl.textContent = campo.label + (campo.obrigatorio ? ' *' : '');
+            grp.appendChild(lbl);
+            grp.appendChild(criarInputCampo(campo, visita));
+            container.appendChild(grp);
+            renderizados.add(campo.id);
+        });
+
+        // Status só no modo edição
+        if (ehEdicao) {
+            const grp = document.createElement('div'); grp.className = 'form-group';
+            grp.innerHTML = `<label>Status Operacional</label>
+                <select class="form-control" id="vStatus">
+                    <option value="agendada">🟡 Agendada</option>
+                    <option value="compareceu">🟢 Compareceu</option>
+                    <option value="nao_compareceu">🔴 Não Compareceu</option>
+                    <option value="reagendada">🔵 Reagendada</option>
+                    <option value="cancelada">⚫ Cancelada</option>
+                </select>`;
+            container.appendChild(grp);
+            container.querySelector('#vStatus').value = visita.status || 'agendada';
+        }
+    }
+
+    function solicitarAberturaCriacaoVisita() {
+        document.getElementById("modalVisitaTitulo").innerText = "Agendar Nova Visita";
+        document.getElementById("formVisitaId").value = "";
+        renderizarFormularioVisitaDinamico(null);
+        document.getElementById("modalVisita").classList.add("active");
+    }
+
+    function solicitarAberturaEdicaoVisita(id) {
+        const v = visitasCache.find(item => item.id === id);
+        if (!v) return;
+        document.getElementById("modalVisitaTitulo").innerText = "Atualizar Detalhes do Atendimento";
+        document.getElementById("formVisitaId").value = v.id;
+        renderizarFormularioVisitaDinamico(v);
+        document.getElementById("modalVisita").classList.add("active");
+    }
+
+    async function coletarESalvarFormularioVisita() {
+        const id = document.getElementById('formVisitaId').value;
+        const dadosSistema = {};
+        const dadosExtras = {};
+        let valido = true;
+
+        const container = document.getElementById('containerCamposDinamicos');
+
+        // Coletar todos os inputs com data-campo-id
+        container.querySelectorAll('[data-campo-id]').forEach(el => {
+            const cid = el.dataset.campoId;
+            const sys = el.dataset.campSistema;
+            const campo = camposCache.find(c => String(c.id) === String(cid));
+            if (!campo) return;
+
+            let valor;
+            if (el.dataset.tipoDp) {
+                // date picker customizado
+                valor = el.querySelector('[data-dp-value]')?.value || '';
+            } else if (el.dataset.tipoMulti) {
+                valor = Array.from(el.querySelectorAll('input[type=checkbox]:checked')).map(cb => cb.value);
+            } else if (el.dataset.tipoCheck) {
+                valor = el.checked;
+            } else {
+                valor = el.value || '';
+            }
+
+            if (campo.obrigatorio && (valor === '' || valor === null || (Array.isArray(valor) && valor.length === 0))) {
+                valido = false;
+                const alvo = el.dataset.tipoDp ? el.querySelector('.datepicker-input') : el;
+                if (alvo?.style) alvo.style.borderColor = '#E74C3C';
+            } else {
+                const alvo = el.dataset.tipoDp ? el.querySelector('.datepicker-input') : el;
+                if (alvo?.style) alvo.style.borderColor = '';
+            }
+
+            if (sys) dadosSistema[sys] = valor;
+            else dadosExtras[String(cid)] = valor;
+        });
+
+        if (!valido) { alert('Preencha todos os campos obrigatórios (*).'); return; }
+        if (!dadosSistema.data || !dadosSistema.horario) { alert('Data e Horário são obrigatórios.'); return; }
+
+        const statusEl = document.getElementById('vStatus');
+        dadosSistema.status = statusEl ? statusEl.value : 'agendada';
+
+        const payload = { ...dadosSistema, dados_extras: dadosExtras };
+
+        if (id) {
+            await _supabase.from('visitas').update(payload).eq('id', parseInt(id));
+        } else {
+            await _supabase.from('visitas').insert([payload]);
+        }
+
+        fecharModaisAtivos();
+        exibirAlertaSucessoToast("Visita registrada com sucesso.");
+        await sincronizarTabelasSupabase();
+    }
+
+    // ===== DASHBOARD =====
+    function filtrarVisitasPorPeriodoAdmin(visitas) {
+        const escopo = document.getElementById("filtroDataAdmin").value;
+        const hoje = new Date();
+        return visitas.filter(v => {
+            if (escopo === 'todos') return true;
+            const dv = new Date(v.data + 'T00:00:00');
+            if (escopo === 'hoje') return v.data === isoStr(hoje);
+            if (escopo === 'semana') {
+                const ini = new Date(hoje); ini.setDate(hoje.getDate() - hoje.getDay());
+                const fim = new Date(ini); fim.setDate(ini.getDate() + 6);
+                return dv >= ini && dv <= fim;
+            }
+            if (escopo === 'mes') return dv.getMonth() === hoje.getMonth() && dv.getFullYear() === hoje.getFullYear();
+            if (escopo === 'ano') return dv.getFullYear() === hoje.getFullYear();
+            return true;
+        });
+    }
+
+    function reprocessarMetricasDashboard() {
+        const filtradas = filtrarVisitasPorPeriodoAdmin(visitasCache);
+        const total = filtradas.length;
+        const comps = filtradas.filter(v => v.status === 'compareceu').length;
+        const faltas = filtradas.filter(v => v.status === 'nao_compareceu').length;
+
+        document.getElementById("kpiTotal").innerText = total;
+        document.getElementById("kpiCompareceu").innerText = comps;
+        document.getElementById("kpiFaltas").innerText = faltas;
+        document.getElementById("kpiTaxaComp").innerText = total ? `${Math.round(comps/total*100)}%` : '0%';
+        document.getElementById("kpiTaxaAus").innerText = total ? `${Math.round(faltas/total*100)}%` : '0%';
+
+        // Cabeçalho dinâmico da tabela baseado na config de relatório
+        const colsRelatorio = exibicaoConfig?.campos_relatorio || ['cliente','corretor','empreendimento','data','horario','status'];
+        const thead = document.getElementById("tableVisitasCabecalho");
+        thead.innerHTML = `<tr>${colsRelatorio.map(k => `<th>${getLabelExibicao(k)}</th>`).join('')}</tr>`;
+
+        const tbody = document.getElementById("tableVisitasCorpo");
+        tbody.innerHTML = "";
+        filtradas.forEach(v => {
+            const cells = colsRelatorio.map(k => {
+                const val = getValorExibicao(v, k);
+                if (k === 'status') return `<td><span class="badge-status-pill st-${v.status}">${val}</span></td>`;
+                if (k === 'cliente') return `<td><b>${val}</b></td>`;
+                return `<td>${val || '<span style="color:var(--texto-secundario)">—</span>'}</td>`;
+            }).join('');
+            tbody.innerHTML += `<tr>${cells}</tr>`;
+        });
+
+        // Ranking
+        const rCorpo = document.getElementById("tableRankingCorpo");
+        rCorpo.innerHTML = "";
+        const contagem = {};
+        corretoresCache.forEach(c => contagem[c.id] = { nome: c.nome, qtd: 0 });
+        filtradas.filter(v => v.status === 'compareceu').forEach(v => {
+            if (contagem[v.corretor_id]) contagem[v.corretor_id].qtd++;
+        });
+        Object.values(contagem).sort((a,b) => b.qtd - a.qtd).forEach((item, i) => {
+            rCorpo.innerHTML += `<tr><td><b>${i+1}º ${item.nome}</b></td><td>${item.qtd} concluídas</td></tr>`;
+        });
+    }
+
+    // ===== CORRETORES =====
+    function renderizarGerenciamentoCorretores() {
+        const corpo = document.getElementById("tableCorretoresCorpo");
+        corpo.innerHTML = "";
+        corretoresCache.forEach(c => {
+            corpo.innerHTML += `<tr>
+                <td>#${c.id}</td>
+                <td><b>${c.nome}</b></td>
+                <td><span style="color:${c.status==='ativo'?'var(--st-compareceu)':'var(--st-nao-comp)'};font-weight:600;">● ${c.status.toUpperCase()}</span></td>
+                <td>
+                    <button class="btn-outline btn-sm" onclick="analisarPerformanceIndividualCorretor(${c.id})">Analisar</button>
+                    <button class="btn-outline btn-sm" onclick="inverterStatusCorretorSupabase(${c.id})">Alternar</button>
+                    <button class="btn-danger btn-sm" onclick="removerCorretorSupabase(${c.id})">Excluir</button>
+                </td>
+            </tr>`;
+        });
+    }
+
+    function chamarModalNovoCorretor() { document.getElementById("modalCorretor").classList.add("active"); }
+
+    async function gravarNovoCorretorSupabase() {
+        const nome = document.getElementById("cNome").value.trim();
+        if (!nome) return;
+        await _supabase.from('corretores').insert([{ nome, status: 'ativo' }]);
+        document.getElementById("cNome").value = "";
+        fecharModaisAtivos();
+        exibirAlertaSucessoToast("Corretor cadastrado!");
+        await sincronizarTabelasSupabase();
+    }
+
+    async function inverterStatusCorretorSupabase(id) {
+        const c = corretoresCache.find(item => item.id === id);
+        if (!c) return;
+        await _supabase.from('corretores').update({ status: c.status === 'ativo' ? 'inativo' : 'ativo' }).eq('id', id);
+        await sincronizarTabelasSupabase();
+    }
+
+    async function removerCorretorSupabase(id) {
+        if (!confirm("Deseja remover este corretor permanentemente?")) return;
+        await _supabase.from('corretores').delete().eq('id', id);
+        document.getElementById("painelAnaliseIndividual").style.display = "none";
+        await sincronizarTabelasSupabase();
+    }
+
+    function analisarPerformanceIndividualCorretor(id) {
+        const c = corretoresCache.find(item => item.id === id);
+        if (!c) return;
+        const vis = visitasCache.filter(v => v.corretor_id === id);
+        const total = vis.length;
+        const comps = vis.filter(v => v.status === 'compareceu').length;
+        const faltas = vis.filter(v => v.status === 'nao_compareceu').length;
+        document.getElementById("tituloAnaliseIndividual").innerText = `Métricas: ${c.nome}`;
+        document.getElementById("indTotal").innerText = total;
+        document.getElementById("indComp").innerText = comps;
+        document.getElementById("indFaltas").innerText = faltas;
+        document.getElementById("indTaxaComp").innerText = total ? `${Math.round(comps/total*100)}%` : '0%';
+        document.getElementById("indTaxaAus").innerText = total ? `${Math.round(faltas/total*100)}%` : '0%';
+        document.getElementById("painelAnaliseIndividual").style.display = "block";
+    }
+
+    // ===== CAMPOS CONFIG =====
+    async function carregarCamposConfig() {
+        const { data, error } = await _supabase.from('campos_visita').select('*').order('ordem');
+        if (!error && data) camposCache = data;
+        if (document.getElementById('subAbaCampos').style.display !== 'none') renderizarSubAbaCampos();
+    }
+
+    function renderizarSubAbaCampos() {
+        const container = document.getElementById('camposListContainer');
+        if (!container) return;
+        container.innerHTML = '';
+
+        camposCache.forEach((campo, idx) => {
+            const row = document.createElement('div');
+            row.className = 'campo-row';
+            row.draggable = true;
+            row.dataset.id = campo.id;
+            row.dataset.idx = idx;
+
+            const tipoLabel = TIPOS_LABEL[campo.tipo] || campo.tipo;
+            const ehSistema = !!campo.campo_sistema;
+
+            row.innerHTML = `
+                <span class="drag-handle">⠿</span>
+                <div class="campo-info">
+                    <div class="campo-nome">${campo.label}</div>
+                    <span class="campo-tipo-tag">${tipoLabel}${ehSistema ? ' · campo do sistema' : ''}</span>
+                </div>
+                <div class="campo-badges">
+                    <span class="campo-badge ${campo.obrigatorio ? 'badge-obrig' : 'badge-opcl'}">${campo.obrigatorio ? 'Obrigatório' : 'Opcional'}</span>
+                    <span class="campo-badge ${campo.visivel_corretor ? 'badge-visivel' : 'badge-oculto'}">${campo.visivel_corretor ? 'Visível' : 'Oculto'}</span>
+                </div>
+                <div class="campo-acoes">
+                    <button class="btn-outline btn-sm" onclick="abrirModalEditarCampo(${campo.id})">Editar</button>
+                    ${!ehSistema ? `<button class="btn-danger btn-sm" onclick="excluirCampoSupabase(${campo.id})">Excluir</button>` : ''}
+                </div>`;
+
+            // Drag & Drop
+            row.addEventListener('dragstart', e => {
+                dragSrcEl = row;
+                e.dataTransfer.effectAllowed = 'move';
+                setTimeout(() => row.classList.add('dragging'), 0);
+            });
+            row.addEventListener('dragend', () => {
+                row.classList.remove('dragging');
+                reordenarCamposSupabase();
+            });
+            row.addEventListener('dragover', e => { e.preventDefault(); row.classList.add('drag-over'); });
+            row.addEventListener('dragleave', () => row.classList.remove('drag-over'));
+            row.addEventListener('drop', e => {
+                e.preventDefault();
+                row.classList.remove('drag-over');
+                if (dragSrcEl && dragSrcEl !== row) {
+                    const allRows = [...container.querySelectorAll('.campo-row')];
+                    const si = allRows.indexOf(dragSrcEl);
+                    const ti = allRows.indexOf(row);
+                    if (si < ti) container.insertBefore(dragSrcEl, row.nextSibling);
+                    else container.insertBefore(dragSrcEl, row);
+                }
+            });
+
+            container.appendChild(row);
+        });
+    }
+
+    async function reordenarCamposSupabase() {
+        const rows = document.querySelectorAll('#camposListContainer .campo-row');
+        const updates = [...rows].map((r, i) => ({ id: parseInt(r.dataset.id), ordem: i + 1 }));
+        for (const u of updates) {
+            await _supabase.from('campos_visita').update({ ordem: u.ordem }).eq('id', u.id);
+        }
+        camposCache.sort((a, b) => {
+            const ai = updates.find(u => u.id === a.id)?.ordem || 0;
+            const bi = updates.find(u => u.id === b.id)?.ordem || 0;
+            return ai - bi;
+        });
+    }
+
+    function selecionarTipoCampo(tipo) {
+        tipoSelecionadoCampo = tipo;
+        document.querySelectorAll('#tipoGrid .tipo-btn').forEach(b => b.classList.remove('selected'));
+        document.querySelector(`[data-tipo="${tipo}"]`)?.classList.add('selected');
+        const mostrarOpcoes = tipo === 'select' || tipo === 'multi';
+        document.getElementById('grupoOpcoesCampo').style.display = mostrarOpcoes ? 'block' : 'none';
+    }
+
+    function abrirModalEditarCampo(id) {
+        document.getElementById('campoEditId').value = id || '';
+        document.getElementById('campoLabel').value = '';
+        document.getElementById('campoOpcoes').value = '';
+        document.getElementById('campoObrigatorio').checked = false;
+        document.getElementById('campoVisivelCorretor').checked = true;
+        document.getElementById('grupoOpcoesCampo').style.display = 'none';
+        tipoSelecionadoCampo = 'text_short';
+        document.querySelectorAll('#tipoGrid .tipo-btn').forEach(b => b.classList.remove('selected'));
+        document.querySelector('[data-tipo="text_short"]')?.classList.add('selected');
+
+        if (id) {
+            const campo = camposCache.find(c => c.id === id);
+            if (campo) {
+                document.getElementById('modalCampoTitulo').innerText = 'Editar Campo';
+                document.getElementById('campoLabel').value = campo.label;
+                document.getElementById('campoObrigatorio').checked = campo.obrigatorio;
+                document.getElementById('campoVisivelCorretor').checked = campo.visivel_corretor;
+                tipoSelecionadoCampo = campo.tipo;
+                document.querySelectorAll('#tipoGrid .tipo-btn').forEach(b => b.classList.remove('selected'));
+                document.querySelector(`[data-tipo="${campo.tipo}"]`)?.classList.add('selected');
+                if (campo.opcoes) {
+                    document.getElementById('campoOpcoes').value = campo.opcoes.join('\n');
+                    if (campo.tipo === 'select' || campo.tipo === 'multi') {
+                        document.getElementById('grupoOpcoesCampo').style.display = 'block';
+                    }
+                }
+                // Bloquear tipo se campo do sistema
+                if (campo.campo_sistema) {
+                    document.querySelectorAll('#tipoGrid .tipo-btn').forEach(b => { b.style.pointerEvents = 'none'; b.style.opacity = '.4'; });
+                }
+            }
+        } else {
+            document.getElementById('modalCampoTitulo').innerText = 'Novo Campo';
+            document.querySelectorAll('#tipoGrid .tipo-btn').forEach(b => { b.style.pointerEvents = ''; b.style.opacity = ''; });
+        }
+
+        document.getElementById('modalCampo').classList.add('active');
+        lucide.createIcons();
+    }
+
+    async function salvarCampoSupabase() {
+        const id = document.getElementById('campoEditId').value;
+        const label = document.getElementById('campoLabel').value.trim();
+        if (!label) { alert('Informe o nome do campo.'); return; }
+
+        const tipo = tipoSelecionadoCampo;
+        const opcoesRaw = document.getElementById('campoOpcoes').value.trim();
+        const opcoes = (tipo === 'select' || tipo === 'multi') && opcoesRaw
+            ? opcoesRaw.split('\n').map(o => o.trim()).filter(Boolean)
+            : null;
+
+        const payload = {
+            label,
+            tipo,
+            opcoes,
+            obrigatorio: document.getElementById('campoObrigatorio').checked,
+            visivel_corretor: document.getElementById('campoVisivelCorretor').checked,
+        };
+
+        if (id) {
+            const campo = camposCache.find(c => c.id === parseInt(id));
+            if (campo?.campo_sistema) {
+                // Para campos de sistema só atualizar label, obrigatorio e visivel
+                await _supabase.from('campos_visita').update({
+                    label: payload.label,
+                    obrigatorio: payload.obrigatorio,
+                    visivel_corretor: payload.visivel_corretor
+                }).eq('id', parseInt(id));
+            } else {
+                await _supabase.from('campos_visita').update(payload).eq('id', parseInt(id));
+            }
+        } else {
+            const maxOrdem = camposCache.length > 0 ? Math.max(...camposCache.map(c => c.ordem)) : 0;
+            await _supabase.from('campos_visita').insert([{ ...payload, ordem: maxOrdem + 1, ativo: true }]);
+        }
+
+        fecharModaisAtivos();
+        exibirAlertaSucessoToast("Campo salvo com sucesso.");
+        await carregarCamposConfig();
+    }
+
+    async function excluirCampoSupabase(id) {
+        if (!confirm("Excluir este campo? Os dados existentes podem ser perdidos.")) return;
+        await _supabase.from('campos_visita').delete().eq('id', id);
+        exibirAlertaSucessoToast("Campo excluído.");
+        await carregarCamposConfig();
+    }
+
+    // ===== EXIBIÇÃO CONFIG =====
+    async function carregarExibicaoConfig() {
+        const { data, error } = await _supabase.from('config_exibicao').select('*').eq('id', 1).single();
+        if (!error && data) exibicaoConfig = data;
+        else exibicaoConfig = {
+            campos_calendario: ['horario', 'cliente'],
+            campos_card: ['horario', 'cliente', 'corretor', 'empreendimento'],
+            campos_lista: ['cliente', 'corretor', 'empreendimento', 'data', 'horario', 'status'],
+            campos_relatorio: ['cliente', 'telefone', 'corretor', 'empreendimento', 'data', 'horario', 'status'],
+            card_tamanho: 'medio',
+            linhas_calendario: 2,
+        };
+        if (document.getElementById('subAbaExibicao').style.display !== 'none') renderizarSubAbaExibicao();
+    }
+
+    let abaExibicaoAtiva = 'calendario';
+
+    function trocarAbaExibicao(aba) {
+        abaExibicaoAtiva = aba;
+        document.querySelectorAll('.exib-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.exib-panel').forEach(p => p.classList.remove('active'));
+        event.target.classList.add('active');
+        document.getElementById(`exibPanel${aba.charAt(0).toUpperCase() + aba.slice(1)}`).classList.add('active');
+    }
+
+    function getAllCamposDisponiveis() {
+        // Campos de sistema + campos customizados
+        const sistema = CAMPOS_SISTEMA.map(s => ({ key: s.key, label: s.label }));
+        const custom = camposCache.filter(c => !c.campo_sistema).map(c => ({ key: String(c.id), label: c.label }));
+        return [...sistema, ...custom];
+    }
+
+    function renderizarSubAbaExibicao() {
+        if (!exibicaoConfig) return;
+
+        const secoes = ['calendario', 'card', 'lista', 'relatorio'];
+        secoes.forEach(sec => {
+            const containerId = `exibLayout${sec.charAt(0).toUpperCase() + sec.slice(1)}`;
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            const selecionados = exibicaoConfig[`campos_${sec}`] || [];
+            const todos = getAllCamposDisponiveis();
+            const disponiveis = todos.filter(c => !selecionados.includes(c.key));
+
+            container.innerHTML = `
+                <div>
+                    <div class="exib-col-title">Disponíveis</div>
+                    <div class="exib-field-list" id="exibDisp_${sec}" ondragover="event.preventDefault()" ondrop="exibDrop(event,'${sec}','disp')"></div>
+                </div>
+                <div>
+                    <div class="exib-col-title">Exibindo (na ordem)</div>
+                    <div class="exib-field-list" id="exibSel_${sec}" ondragover="event.preventDefault()" ondrop="exibDrop(event,'${sec}','sel')"></div>
+                </div>`;
+
+            disponiveis.forEach(c => {
+                document.getElementById(`exibDisp_${sec}`).appendChild(criarExibFieldItem(c, sec, 'disp'));
+            });
+            selecionados.forEach(key => {
+                const c = todos.find(t => t.key === key);
+                if (c) document.getElementById(`exibSel_${sec}`).appendChild(criarExibFieldItem(c, sec, 'sel'));
+            });
+        });
+
+        // Card size
+        const tamanho = exibicaoConfig.card_tamanho || 'medio';
+        ['pequeno','medio','grande'].forEach(t => {
+            document.getElementById(`sizeOpt${t.charAt(0).toUpperCase() + t.slice(1)}`)?.classList.toggle('selected', t === tamanho);
+        });
+
+        // Linhas calendário
+        document.getElementById('cfgLinhasCalendario').value = exibicaoConfig.linhas_calendario || 2;
+    }
+
+    function criarExibFieldItem(campo, sec, lado) {
+        const item = document.createElement('div');
+        item.className = 'exib-field-item';
+        item.draggable = true;
+        item.dataset.key = campo.key;
+        item.dataset.sec = sec;
+        item.dataset.lado = lado;
+        item.innerHTML = `<span class="drag-handle">⠿</span><span style="flex:1">${campo.label}</span>
+            <button class="exib-move-btn" onclick="exibMover('${campo.key}','${sec}','${lado}')" title="${lado==='disp'?'Adicionar':'Remover'}">${lado === 'disp' ? '→' : '←'}</button>`;
+
+        item.addEventListener('dragstart', e => {
+            dragSrcEl = item;
+            e.dataTransfer.effectAllowed = 'move';
+            setTimeout(() => item.classList.add('dragging'), 0);
+        });
+        item.addEventListener('dragend', () => item.classList.remove('dragging'));
+        item.addEventListener('dragover', e => { e.preventDefault(); item.classList.add('drag-over'); });
+        item.addEventListener('dragleave', () => item.classList.remove('drag-over'));
+        item.addEventListener('drop', e => {
+            e.preventDefault();
+            item.classList.remove('drag-over');
+            if (!dragSrcEl || dragSrcEl === item) return;
+            const lista = item.parentElement;
+            const all = [...lista.querySelectorAll('.exib-field-item')];
+            const si = all.indexOf(dragSrcEl);
+            const ti = all.indexOf(item);
+            if (si < ti) lista.insertBefore(dragSrcEl, item.nextSibling);
+            else lista.insertBefore(dragSrcEl, item);
+        });
+
+        return item;
+    }
+
+    function exibMover(key, sec, ladoAtual) {
+        const novoLado = ladoAtual === 'disp' ? 'sel' : 'disp';
+        const todos = getAllCamposDisponiveis();
+        const campo = todos.find(c => c.key === key);
+        if (!campo) return;
+
+        const listaAtual = document.getElementById(`exib${ladoAtual === 'disp' ? 'Disp' : 'Sel'}_${sec}`);
+        const listaDest = document.getElementById(`exib${novoLado === 'disp' ? 'Disp' : 'Sel'}_${sec}`);
+
+        const item = listaAtual.querySelector(`[data-key="${key}"]`);
+        if (item) {
+            listaAtual.removeChild(item);
+            listaDest.appendChild(criarExibFieldItem(campo, sec, novoLado));
+        }
+    }
+
+    function exibDrop(e, sec, ladoDrop) {
+        e.preventDefault();
+        if (!dragSrcEl) return;
+        const ladoSrc = dragSrcEl.dataset.lado;
+        const key = dragSrcEl.dataset.key;
+
+        if (ladoSrc === ladoDrop) return; // reordenação já tratada pelo item
+
+        // Mover entre listas
+        exibMover(key, sec, ladoSrc);
+    }
+
+    function lerOrdemExibicao(sec) {
+        const lista = document.getElementById(`exibSel_${sec}`);
+        if (!lista) return [];
+        return [...lista.querySelectorAll('.exib-field-item')].map(el => el.dataset.key);
+    }
+
+    function selecionarTamanhoCard(tamanho) {
+        ['pequeno','medio','grande'].forEach(t => {
+            document.getElementById(`sizeOpt${t.charAt(0).toUpperCase() + t.slice(1)}`)?.classList.toggle('selected', t === tamanho);
+        });
+    }
+
+    function getTamanhoCardSelecionado() {
+        for (const t of ['pequeno','medio','grande']) {
+            if (document.getElementById(`sizeOpt${t.charAt(0).toUpperCase() + t.slice(1)}`)?.classList.contains('selected')) return t;
+        }
+        return 'medio';
+    }
+
+    async function salvarExibicaoConfig() {
+        const payload = {
+            campos_calendario: lerOrdemExibicao('calendario'),
+            campos_card: lerOrdemExibicao('card'),
+            campos_lista: lerOrdemExibicao('lista'),
+            campos_relatorio: lerOrdemExibicao('relatorio'),
+            card_tamanho: getTamanhoCardSelecionado(),
+            linhas_calendario: parseInt(document.getElementById('cfgLinhasCalendario').value) || 2,
+        };
+
+        await _supabase.from('config_exibicao').update(payload).eq('id', 1);
+        exibicaoConfig = { ...exibicaoConfig, ...payload };
+        exibirAlertaSucessoToast("Configurações de exibição salvas!");
+        renderizarComponenteCalendarioBase();
+        reprocessarMetricasDashboard();
+    }
+
+    // ===== EXPORTAÇÕES =====
+    function gerarExportacaoPlanilhaExcel() {
+        const cols = exibicaoConfig?.campos_relatorio || ['cliente','corretor','empreendimento','data','horario','status'];
+        const dados = visitasCache.map(v => {
+            const obj = {};
+            cols.forEach(k => { obj[getLabelExibicao(k)] = getValorExibicao(v, k); });
+            return obj;
+        });
+        const planilha = XLSX.utils.json_to_sheet(dados);
+        const livro = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(livro, planilha, "Visitas");
+        XLSX.writeFile(livro, "Agenda_Audaz_Relatorio.xlsx");
+    }
+
+    function gerarExportacaoDocumentoPDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        doc.setFont("Helvetica","bold"); doc.setFontSize(18);
+        doc.text("Agenda Audaz - Relatório Gerencial", 14, 20);
+        doc.setFontSize(10); doc.setFont("Helvetica","normal");
+        doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`, 14, 26);
+        const cols = exibicaoConfig?.campos_relatorio || ['cliente','corretor','empreendimento','data','horario','status'];
+        const cabecalho = cols.map(k => getLabelExibicao(k));
+        const linhas = visitasCache.map(v => cols.map(k => getValorExibicao(v, k)));
+        doc.autoTable({ startY:32, head:[cabecalho], body:linhas, theme:'striped', headStyles:{ fillColor:[212,175,55], textColor:[17,17,17] } });
+        doc.save("Agenda_Audaz_Relatorio.pdf");
+    }
+
+    // ===== DATE PICKER CUSTOMIZADO =====
+    let dpAtivo = null; // referência ao picker aberto
+
+    function criarDatePickerCustom(campo, valorInicial) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'datepicker-wrapper';
+        wrapper.dataset.campoId = campo.id;
+        wrapper.dataset.campSistema = campo.campo_sistema || '';
+        wrapper.dataset.tipoDp = '1';
+
+        // Input hidden que guarda o valor ISO
+        const hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.dataset.dpValue = '1';
+        hidden.value = valorInicial || '';
+
+        // Display clicável
+        const display = document.createElement('div');
+        display.className = 'datepicker-input';
+        display.innerHTML = `<span class="dp-text">${valorInicial ? formatarDataBR(valorInicial) : '<span class="dp-placeholder">Selecione uma data</span>'}</span><span class="dp-icon">📅</span>`;
+
+        wrapper.appendChild(hidden);
+        wrapper.appendChild(display);
+
+        display.addEventListener('click', e => {
+            e.stopPropagation();
+            if (dpAtivo && dpAtivo !== wrapper) fecharDatePicker(dpAtivo);
+            if (wrapper.querySelector('.datepicker-popup')) {
+                fecharDatePicker(wrapper);
+            } else {
+                abrirDatePicker(wrapper, hidden.value);
+                display.classList.add('open');
+            }
+        });
+
+        return wrapper;
+    }
+
+    function formatarDataBR(iso) {
+        if (!iso) return '';
+        const [y, m, d] = iso.split('-');
+        return `${d}/${m}/${y}`;
+    }
+
+    function abrirDatePicker(wrapper, valorAtual) {
+        dpAtivo = wrapper;
+        const hoje = new Date();
+        let dpMes = hoje.getMonth();
+        let dpAno = hoje.getFullYear();
+
+        if (valorAtual) {
+            const [y, m] = valorAtual.split('-');
+            dpAno = parseInt(y); dpMes = parseInt(m) - 1;
+        }
+
+        const popup = document.createElement('div');
+        popup.className = 'datepicker-popup';
+        wrapper.appendChild(popup);
+
+        // Verifica se deve abrir pra cima
+        const rect = wrapper.getBoundingClientRect();
+        if (rect.bottom + 340 > window.innerHeight && rect.top > 340) popup.classList.add('dp-up');
+
+        function renderPopup() {
+            const selecionado = wrapper.querySelector('[data-dp-value]').value;
+            const primDia = new Date(dpAno, dpMes, 1).getDay();
+            const ultimoDia = new Date(dpAno, dpMes + 1, 0).getDate();
+
+            popup.innerHTML = `
+                <div class="dp-header">
+                    <button class="dp-nav" id="dpPrev">‹</button>
+                    <span class="dp-month-label">${mesesNomes[dpMes]} ${dpAno}</span>
+                    <button class="dp-nav" id="dpNext">›</button>
+                </div>
+                <div class="dp-grid">
+                    ${diasSemanaNomes.map(d => `<div class="dp-weekday">${d[0]}</div>`).join('')}
+                    ${Array(primDia).fill('<div class="dp-day dp-empty"></div>').join('')}
+                    ${Array.from({length: ultimoDia}, (_, i) => {
+                        const d = i + 1;
+                        const iso = `${dpAno}-${String(dpMes+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                        const isHoje = d === hoje.getDate() && dpMes === hoje.getMonth() && dpAno === hoje.getFullYear();
+                        const isSel = iso === selecionado;
+                        return `<div class="dp-day${isHoje ? ' dp-today' : ''}${isSel ? ' dp-selected' : ''}" data-iso="${iso}">${d}</div>`;
+                    }).join('')}
+                </div>
+                <div class="dp-footer">
+                    <button class="dp-today-btn">Hoje</button>
+                    <button class="dp-clear-btn">Limpar</button>
+                </div>`;
+
+            popup.querySelector('#dpPrev').onclick = e => { e.stopPropagation(); dpMes--; if (dpMes < 0) { dpMes = 11; dpAno--; } renderPopup(); };
+            popup.querySelector('#dpNext').onclick = e => { e.stopPropagation(); dpMes++; if (dpMes > 11) { dpMes = 0; dpAno++; } renderPopup(); };
+            popup.querySelector('.dp-today-btn').onclick = e => { e.stopPropagation(); selecionarDia(wrapper, `${hoje.getFullYear()}-${String(hoje.getMonth()+1).padStart(2,'0')}-${String(hoje.getDate()).padStart(2,'0')}`); };
+            popup.querySelector('.dp-clear-btn').onclick = e => { e.stopPropagation(); selecionarDia(wrapper, ''); };
+
+            popup.querySelectorAll('.dp-day:not(.dp-empty)').forEach(el => {
+                el.addEventListener('click', e => { e.stopPropagation(); selecionarDia(wrapper, el.dataset.iso); });
+            });
+        }
+
+        renderPopup();
+    }
+
+    function selecionarDia(wrapper, iso) {
+        const hidden = wrapper.querySelector('[data-dp-value]');
+        const display = wrapper.querySelector('.dp-text');
+        hidden.value = iso;
+        display.innerHTML = iso ? formatarDataBR(iso) : '<span class="dp-placeholder">Selecione uma data</span>';
+        fecharDatePicker(wrapper);
+    }
+
+    function fecharDatePicker(wrapper) {
+        const popup = wrapper?.querySelector('.datepicker-popup');
+        if (popup) popup.remove();
+        wrapper?.querySelector('.datepicker-input')?.classList.remove('open');
+        if (dpAtivo === wrapper) dpAtivo = null;
+    }
+
+    // Fechar picker ao clicar fora
+    document.addEventListener('click', () => {
+        if (dpAtivo) fecharDatePicker(dpAtivo);
+    });
+
+    // ===== MODAIS =====
+    function fecharModaisAtivos() { document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active')); }
+</script>
+</body>
+</html>
