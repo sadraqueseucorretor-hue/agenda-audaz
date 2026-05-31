@@ -344,8 +344,9 @@
             /* Toast */
             .toast-notification { left:14px; right:14px; bottom:14px; text-align:center; }
 
-            /* Date picker */
-            .datepicker-popup { width:calc(100vw - 40px); left:50%; transform:translateX(-50%); }
+            /* Date picker — handled via .dp-mobile class in JS */
+            .dp-day { font-size:15px; min-height:36px; }
+            .dp-weekday { font-size:12px; }
         }
 
         /* Botão flutuante mobile para adicionar visita */
@@ -365,6 +366,10 @@
         .datepicker-input .dp-icon { color:var(--texto-secundario); font-size:16px; flex-shrink:0; }
         .datepicker-popup { position:absolute; top:calc(100% + 8px); left:0; z-index:2000; background:var(--bg-card); border:1px solid var(--bordas); border-radius:12px; box-shadow:0 8px 40px rgba(0,0,0,.6); width:320px; padding:16px; animation:dpFadeIn .15s ease; }
         .datepicker-popup.dp-up { top:auto; bottom:calc(100% + 8px); }
+        /* Mobile: popup fixo no centro da tela, sem depender do pai */
+        .datepicker-popup.dp-mobile { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); width:calc(100vw - 32px); max-width:340px; bottom:auto; z-index:3000; }
+        .dp-backdrop { display:none; }
+        .dp-backdrop.active { display:block; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:2999; }
         @keyframes dpFadeIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
         .dp-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
         .dp-nav { background:none; border:1px solid var(--bordas); color:var(--texto-principal); width:32px; height:32px; border-radius:6px; cursor:pointer; font-size:16px; display:flex; align-items:center; justify-content:center; transition:all .15s; }
@@ -391,6 +396,7 @@
 
 <div class="toast-notification" id="toastMsg">Alterações salvas com sucesso.</div>
 <button class="fab-add" onclick="solicitarAberturaCriacaoVisita()" title="Nova Visita">+</button>
+<div class="dp-backdrop" id="dpBackdrop"></div>
 
 <header class="main-header">
     <div class="brand-area">
@@ -2170,13 +2176,23 @@
             dpAno = parseInt(y); dpMes = parseInt(m) - 1;
         }
 
+        const isMobile = window.innerWidth < 768;
         const popup = document.createElement('div');
         popup.className = 'datepicker-popup';
-        wrapper.appendChild(popup);
 
-        // Verifica se deve abrir pra cima
-        const rect = wrapper.getBoundingClientRect();
-        if (rect.bottom + 340 > window.innerHeight && rect.top > 340) popup.classList.add('dp-up');
+        if (isMobile) {
+            // Mobile: fixo no centro da tela, ancorado no body
+            popup.classList.add('dp-mobile');
+            document.body.appendChild(popup);
+            const backdrop = document.getElementById('dpBackdrop');
+            backdrop.classList.add('active');
+            backdrop.onclick = () => fecharDatePicker(wrapper);
+        } else {
+            // Desktop: relativo ao wrapper
+            wrapper.appendChild(popup);
+            const rect = wrapper.getBoundingClientRect();
+            if (rect.bottom + 340 > window.innerHeight && rect.top > 340) popup.classList.add('dp-up');
+        }
 
         function renderPopup() {
             const selecionado = wrapper.querySelector('[data-dp-value]').value;
@@ -2227,15 +2243,22 @@
     }
 
     function fecharDatePicker(wrapper) {
-        const popup = wrapper?.querySelector('.datepicker-popup');
-        if (popup) popup.remove();
+        // Remove do wrapper (desktop) ou do body (mobile)
+        const popupLocal = wrapper?.querySelector('.datepicker-popup');
+        if (popupLocal) popupLocal.remove();
+        const popupGlobal = document.body.querySelector('.dp-mobile');
+        if (popupGlobal) popupGlobal.remove();
+        // Fecha backdrop mobile
+        document.getElementById('dpBackdrop')?.classList.remove('active');
         wrapper?.querySelector('.datepicker-input')?.classList.remove('open');
         if (dpAtivo === wrapper) dpAtivo = null;
     }
 
-    // Fechar picker ao clicar fora
-    document.addEventListener('click', () => {
-        if (dpAtivo) fecharDatePicker(dpAtivo);
+    // Fechar picker ao clicar fora (desktop)
+    document.addEventListener('click', e => {
+        if (!dpAtivo) return;
+        if (e.target.closest('.datepicker-wrapper') || e.target.closest('.dp-mobile')) return;
+        fecharDatePicker(dpAtivo);
     });
 
     // ===== MODAIS =====
