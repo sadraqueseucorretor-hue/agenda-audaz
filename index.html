@@ -63,12 +63,37 @@
         .day-cell.today { background:rgba(212,175,55,.04); }
         .day-cell.today .day-number { background:var(--cor-botoes); color:#111; width:22px; height:22px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:11px; }
 
-        .grid-weekly-day { display:grid; grid-template-columns:75px repeat(7,1fr); }
-        .grid-single-day { display:grid; grid-template-columns:75px 1fr; }
-        .time-col { border-right:1px solid var(--bordas); background:rgba(0,0,0,.1); }
-        .time-slot-label { height:60px; display:flex; align-items:center; justify-content:center; font-size:11px; color:var(--texto-secundario); border-bottom:1px solid var(--bordas); }
+        .grid-weekly-day { display:grid; grid-template-columns:60px repeat(7,1fr); }
+        .grid-single-day { display:grid; grid-template-columns:60px 1fr; }
+
+        /* Coluna de horários */
+        .time-col { border-right:1px solid var(--bordas); background:rgba(0,0,0,.12); }
+        .time-col-header { height:88px; border-bottom:1px solid var(--bordas); }
+        .time-slot-label { height:60px; display:flex; align-items:flex-start; justify-content:center; padding-top:6px; font-size:10px; font-weight:600; color:rgba(255,255,255,.25); border-bottom:1px solid rgba(255,255,255,.04); letter-spacing:.3px; }
+
+        /* Colunas de dias */
         .column-day { border-right:1px solid var(--bordas); position:relative; background:var(--cor-calendario); min-height:720px; }
-        .column-header { text-align:center; padding:10px; border-bottom:1px solid var(--bordas); background:rgba(0,0,0,.15); }
+        .column-day:last-child { border-right:none; }
+
+        /* Cabeçalho coluna semana/dia */
+        .column-header { text-align:center; padding:12px 6px 10px; border-bottom:1px solid var(--bordas); background:rgba(0,0,0,.18); height:88px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; }
+        .col-dia-nome { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.8px; color:var(--texto-secundario); }
+        .col-dia-num  { font-size:32px; font-weight:800; line-height:1; color:var(--texto-principal); }
+        .col-visit-badge { font-size:10px; font-weight:600; padding:2px 8px; border-radius:10px; background:rgba(255,255,255,.06); color:var(--texto-secundario); margin-top:2px; }
+        .column-day.hoje-col .col-dia-num  { color:var(--cor-botoes); }
+        .column-day.hoje-col .col-dia-nome { color:var(--cor-botoes); opacity:.8; }
+        .column-day.hoje-col .col-visit-badge { background:rgba(212,175,55,.12); color:var(--cor-botoes); }
+        .column-day.hoje-col { background:rgba(212,175,55,.02); }
+
+        /* Linhas de hora dentro da coluna */
+        .hour-row { position:absolute; left:0; right:0; height:60px; border-bottom:1px solid rgba(255,255,255,.04); cursor:pointer; transition:background .1s; }
+        .hour-row:hover { background:rgba(212,175,55,.04); }
+        .hour-row:hover::after { content:'+ Visita'; position:absolute; right:8px; top:50%; transform:translateY(-50%); font-size:10px; color:var(--cor-botoes); opacity:.7; font-weight:600; }
+
+        /* Linha vermelha hora atual */
+        .current-time-line { position:absolute; left:0; right:0; z-index:20; pointer-events:none; }
+        .current-time-line .ct-dot  { position:absolute; left:-5px; top:-5px; width:10px; height:10px; border-radius:50%; background:#E74C3C; box-shadow:0 0 6px rgba(231,76,60,.6); }
+        .current-time-line .ct-bar  { position:absolute; left:5px; right:0; top:-1px; height:2px; background:#E74C3C; opacity:.75; }
 
         /* ======== CARDS DE EVENTO REDESENHADOS ======== */
         .event-card { border-radius:6px; cursor:pointer; overflow:hidden; border-left:3px solid transparent; transition:transform .12s, box-shadow .12s, filter .12s; position:relative; margin-bottom:3px; }
@@ -101,10 +126,18 @@
         .event-card.card-mes.card-grande .ec-nome { font-size:12px; }
 
         /* Visão SEMANA/DIA — card posicionado */
-        .event-card.card-semana { position:absolute; left:4px; right:4px; border-radius:6px; z-index:5; padding:6px 8px; }
-        .event-card.card-semana .ec-hora-badge { display:inline-flex; align-items:center; gap:4px; font-size:10px; font-weight:700; padding:1px 6px; border-radius:10px; margin-bottom:4px; background:rgba(0,0,0,.25); color:#fff; }
-        .event-card.card-semana .ec-nome  { font-size:11px; font-weight:700; color:var(--texto-principal); line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-        .event-card.card-semana .ec-sub   { font-size:10px; color:rgba(255,255,255,.65); line-height:1.3; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .event-card.card-semana { position:absolute; left:4px; right:4px; border-radius:7px; z-index:5; padding:7px 9px 6px; border-left-width:4px; box-shadow:0 2px 8px rgba(0,0,0,.35); }
+        .event-card.card-semana:hover { z-index:15; transform:translateX(2px) scale(1.01); box-shadow:0 6px 20px rgba(0,0,0,.5); }
+        .event-card.card-semana .ec-topo { display:flex; align-items:center; justify-content:space-between; margin-bottom:4px; }
+        .event-card.card-semana .ec-hora-badge { font-size:10px; font-weight:800; padding:1px 7px; border-radius:10px; background:rgba(0,0,0,.3); color:#fff; letter-spacing:.3px; }
+        .event-card.card-semana .ec-status-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+        .event-card.card-semana.st-agendada    .ec-status-dot { background:var(--st-agendada); }
+        .event-card.card-semana.st-compareceu  .ec-status-dot { background:var(--st-compareceu); }
+        .event-card.card-semana.st-nao_compareceu .ec-status-dot { background:var(--st-nao-comp); }
+        .event-card.card-semana.st-reagendada  .ec-status-dot { background:var(--st-reagendada); }
+        .event-card.card-semana .ec-nome  { font-size:12px; font-weight:700; color:#fff; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .event-card.card-semana .ec-linha { font-size:10px; color:rgba(255,255,255,.65); line-height:1.4; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:2px; display:flex; align-items:center; gap:4px; }
+        .event-card.card-semana .ec-linha::before { content:''; width:3px; height:3px; border-radius:50%; background:rgba(255,255,255,.4); flex-shrink:0; }
 
         /* Fallback para tags antigas (compatibilidade) */
         .event-tag { display:none; }
@@ -926,18 +959,29 @@
         const vals = camposConteudo.map(k => getValorExibicao(visita, k)).filter(Boolean);
 
         const principal = vals[0] || '';
-        const secundario = vals.slice(1, 3).join(' · ');
-        const altura = tamanho === 'pequeno' ? 30 : tamanho === 'grande' ? 72 : 52;
+        const linhasSecundarias = vals.slice(1);
+
+        const alturaBase = tamanho === 'pequeno' ? 34 : tamanho === 'grande' ? 90 : 62;
+        const alturaExtra = tamanho === 'pequeno' ? 0 : Math.min(linhasSecundarias.length, 3) * 16;
+        const altura = alturaBase + alturaExtra;
 
         const h = parseInt(visita.horario.split(":")[0]) - 8;
         const m = parseInt(visita.horario.split(":")[1] || 0);
-        const top = 55 + (h * 60) + m;
+        const top = 88 + (h * 60) + m;
+
+        const linhasHTML = tamanho !== 'pequeno'
+            ? linhasSecundarias.slice(0, tamanho === 'grande' ? 4 : 2)
+                .map(v => `<div class="ec-linha">${v}</div>`).join('')
+            : '';
 
         return { top, altura, html: `
             <div class="event-card card-semana st-${visita.status}" style="top:${top}px;height:${altura}px;" onclick="solicitarAberturaEdicaoVisita(${visita.id})">
-                <div class="ec-hora-badge">${hora}</div>
+                <div class="ec-topo">
+                    <span class="ec-hora-badge">${hora}</span>
+                    <span class="ec-status-dot"></span>
+                </div>
                 ${principal ? `<div class="ec-nome">${principal}</div>` : ''}
-                ${secundario ? `<div class="ec-sub">${secundario}</div>` : ''}
+                ${linhasHTML}
             </div>`
         };
     }
@@ -983,37 +1027,115 @@
             target.appendChild(grid);
         } else {
             const total = visaoAtiva === 'semana' ? 7 : 1;
-            // Fix: criar nova instância com dia explícito para evitar overflow
             const inicio = new Date(dataFoco.getFullYear(), dataFoco.getMonth(),
                 visaoAtiva === 'semana' ? dataFoco.getDate() - dataFoco.getDay() : dataFoco.getDate());
             txtPeriodo.innerText = visaoAtiva === 'semana'
                 ? `Semana de ${inicio.getDate()} de ${mesesNomes[inicio.getMonth()]}`
                 : `${dataFoco.getDate()} de ${mesesNomes[dataFoco.getMonth()]} de ${dataFoco.getFullYear()}`;
+
             const grid = document.createElement("div");
             grid.className = visaoAtiva === 'semana' ? "grid-weekly-day" : "grid-single-day";
             grid.appendChild(gerarGradeHorariosVertical());
+
+            const agora = new Date();
+            const isoHoje = isoStr(agora);
+
             for (let i = 0; i < total; i++) {
-                const dia = new Date(inicio);
-                if (visaoAtiva === 'semana') dia.setDate(inicio.getDate() + i);
+                const dia = new Date(inicio.getFullYear(), inicio.getMonth(), inicio.getDate() + i);
                 const iso = isoStr(dia);
+                const ehHoje = iso === isoHoje;
+                const visitasDia = filtradas.filter(v => v.data === iso);
+
                 const col = document.createElement("div");
-                col.className = "column-day";
-                col.innerHTML = `<div class="column-header"><strong>${diasSemanaNomes[dia.getDay()]}</strong> ${dia.getDate()}</div>`;
-                filtradas.filter(v => v.data === iso)
-                    .sort((a,b) => a.horario > b.horario ? 1 : -1)
+                col.className = `column-day${ehHoje ? ' hoje-col' : ''}`;
+
+                // Cabeçalho rico
+                const badge = visitasDia.length > 0
+                    ? `<div class="col-visit-badge">${visitasDia.length} visita${visitasDia.length > 1 ? 's' : ''}</div>`
+                    : `<div class="col-visit-badge">Livre</div>`;
+                col.innerHTML = `<div class="column-header">
+                    <div class="col-dia-nome">${diasSemanaNomes[dia.getDay()]}</div>
+                    <div class="col-dia-num">${dia.getDate()}</div>
+                    ${badge}
+                </div>`;
+
+                // Linhas de hora clicáveis (para criar visita)
+                for (let h = 8; h <= 19; h++) {
+                    const hRow = document.createElement('div');
+                    hRow.className = 'hour-row';
+                    hRow.style.top = `${88 + (h - 8) * 60}px`;
+                    const hISO = iso;
+                    const hStr = `${String(h).padStart(2,'0')}:00`;
+                    hRow.onclick = () => abrirVisitaComDataHora(hISO, hStr);
+                    col.appendChild(hRow);
+                }
+
+                // Cards de visitas
+                visitasDia.sort((a,b) => a.horario > b.horario ? 1 : -1)
                     .forEach(v => { col.insertAdjacentHTML('beforeend', montarCardSemana(v).html); });
+
+                // Linha vermelha do horário atual (só hoje)
+                if (ehHoje) {
+                    const minutos = agora.getHours() * 60 + agora.getMinutes();
+                    const minInicio = 8 * 60;
+                    if (minutos >= minInicio && minutos <= 19 * 60 + 60) {
+                        const topLinha = 88 + (minutos - minInicio);
+                        col.insertAdjacentHTML('beforeend',
+                            `<div class="current-time-line" style="top:${topLinha}px">
+                                <div class="ct-dot"></div>
+                                <div class="ct-bar"></div>
+                            </div>`);
+                    }
+                }
+
                 grid.appendChild(col);
             }
             target.appendChild(grid);
+
+            // Scroll automático para o horário atual (ou 8h)
+            requestAnimationFrame(() => {
+                const agora2 = new Date();
+                const minutos = agora2.getHours() * 60 + agora2.getMinutes();
+                const scrollTop = Math.max(0, 88 + (minutos - 8 * 60) - 120);
+                target.scrollTop = scrollTop;
+                target.style.overflowY = 'auto';
+                target.style.maxHeight = '780px';
+            });
+
+            // Atualiza linha vermelha a cada minuto
+            clearInterval(window._ctInterval);
+            window._ctInterval = setInterval(() => {
+                if (visaoAtiva !== 'mes') renderizarComponenteCalendarioBase();
+            }, 60000);
         }
     }
 
     function gerarGradeHorariosVertical() {
         const col = document.createElement("div");
         col.className = "time-col";
-        col.innerHTML = `<div class="column-header" style="visibility:hidden">H</div>`;
-        for (let h = 8; h <= 19; h++) col.innerHTML += `<div class="time-slot-label">${String(h).padStart(2,'0')}:00</div>`;
+        col.innerHTML = `<div class="time-col-header"></div>`;
+        for (let h = 8; h <= 19; h++) {
+            col.innerHTML += `<div class="time-slot-label">${String(h).padStart(2,'0')}h</div>`;
+        }
         return col;
+    }
+
+    function abrirVisitaComDataHora(iso, hora) {
+        solicitarAberturaCriacaoVisita();
+        // Preenche data e hora após o modal renderizar
+        requestAnimationFrame(() => {
+            // Data picker
+            const dpWrapper = document.querySelector('#containerCamposDinamicos [data-tipo-dp]');
+            if (dpWrapper) {
+                const hidden = dpWrapper.querySelector('[data-dp-value]');
+                const display = dpWrapper.querySelector('.dp-text');
+                if (hidden) { hidden.value = iso; display.innerHTML = formatarDataBR(iso); }
+            }
+            // Hora
+            const horaInput = document.querySelector('#containerCamposDinamicos [data-camp-sistema="horario"], #containerCamposDinamicos [data-campsistema="horario"]');
+            const allTimeInputs = document.querySelectorAll('#containerCamposDinamicos input[type="time"]');
+            if (allTimeInputs.length > 0) allTimeInputs[0].value = hora;
+        });
     }
 
     // ===== FILTROS =====
