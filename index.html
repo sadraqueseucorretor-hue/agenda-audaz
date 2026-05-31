@@ -953,7 +953,9 @@
         const filtradas = visitasCache.filter(v => {
             const mC = fCorr === "todos" || String(v.corretor_id) === fCorr;
             const mS = fStat === "todos" || v.status === fStat;
-            return mC && mS;
+            // Canceladas somem do calendário, a menos que o filtro peça especificamente por elas
+            const naoEhCancelada = fStat === 'cancelada' || v.status !== 'cancelada';
+            return mC && mS && naoEhCancelada;
         });
 
         if (visaoAtiva === 'mes') {
