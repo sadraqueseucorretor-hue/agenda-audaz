@@ -803,12 +803,30 @@
         configurarRealtimeSupabase();
     });
 
+    // ===== SANITIZAÇÃO XSS =====
+    function esc(str) {
+        return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
     // ===== TOAST =====
     function exibirAlertaSucessoToast(msg) {
         const toast = document.getElementById("toastMsg");
         toast.textContent = msg || "Alterações salvas com sucesso.";
+        toast.style.background = '#2ECC71';
         toast.classList.add("active");
-        setTimeout(() => toast.classList.remove("active"), 3000);
+        setTimeout(() => toast.classList.remove("active"), 3500);
+    }
+    function exibirAlertaErroToast(msg) {
+        const toast = document.getElementById("toastMsg");
+        toast.textContent = msg || "Erro ao salvar. Verifique sua conexão.";
+        toast.style.background = '#E74C3C';
+        toast.classList.add("active");
+        setTimeout(() => toast.classList.remove("active"), 4000);
+    }
+    function setBtnLoading(btn, loading) {
+        if (!btn) return;
+        if (loading) { btn.dataset.textoOriginal = btn.innerHTML; btn.innerHTML = '⏳ Salvando…'; btn.disabled = true; }
+        else { btn.innerHTML = btn.dataset.textoOriginal || btn.innerHTML; btn.disabled = false; }
     }
 
     // ===== REALTIME =====
@@ -824,12 +842,19 @@
 
     // ===== SYNC =====
     async function sincronizarTabelasSupabase() {
+        const cal = document.getElementById('calendarioTarget');
+        if (cal && !visitasCache.length) cal.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:300px;color:var(--texto-secundario);gap:10px;font-size:14px;">⏳ Carregando agendamentos…</div>';
+
         const [resCorr, resVis] = await Promise.all([
             _supabase.from('corretores').select('*').order('nome'),
-            _supabase.from('visitas').select('*')
+            _supabase.from('visitas').select('*').order('data', { ascending: false })
         ]);
-        if (!resCorr.error) corretoresCache = resCorr.data;
-        if (!resVis.error) visitasCache = resVis.data;
+
+        if (resCorr.error) { exibirAlertaErroToast('Erro ao carregar corretores.'); return; }
+        if (resVis.error)  { exibirAlertaErroToast('Erro ao carregar visitas.'); return; }
+
+        corretoresCache = resCorr.data;
+        visitasCache = resVis.data;
 
         atualizarSeletoresInterfaceFiltros();
         renderizarComponenteCalendarioBase();
@@ -906,8 +931,12 @@
             co_st_reagendada: document.getElementById("cpStReagendada").value,
             co_st_cancelada: document.getElementById("cpStCancelada").value
         };
-        await _supabase.from('configuracoes').update(params).eq('id', 1);
-        exibirAlertaSucessoToast();
+        const btn = document.querySelector('#subAbaConfig .btn-custom');
+        setBtnLoading(btn, true);
+        const { error } = await _supabase.from('configuracoes').update(params).eq('id', 1);
+        setBtnLoading(btn, false);
+        if (error) { exibirAlertaErroToast('Erro ao salvar configurações.'); return; }
+        exibirAlertaSucessoToast('Configurações salvas!');
         await carregarConfiguracoesPlataforma();
     }
 
@@ -1062,15 +1091,18 @@
 
         const tamanhoClass = tamanho !== 'medio' ? ` card-${tamanho}` : '';
 
-        return `<div class="event-card card-mes st-${visita.status}${tamanhoClass}" onclick="solicitarAberturaEdicaoVisita(${visita.id})">
-            ${hora ? `<div class="ec-hora">${hora}</div>` : ''}
-            ${principal ? `<div class="ec-nome">${principal}</div>` : ''}
-            ${secundarios ? `<div class="ec-sub">${secundarios}</div>` : ''}
+        return `<div class="event-card card-mes st-${esc(visita.status)}${tamanhoClass}" onclick="solicitarAberturaEdicaoVisita(${visita.id})">
+            ${hora ? `<div class="ec-hora">${esc(hora)}</div>` : ''}
+            ${principal ? `<div class="ec-nome">${esc(principal)}</div>` : ''}
+            ${secundarios ? `<div class="ec-sub">${esc(secundarios)}</div>` : ''}
         </div>`;
     }
 
     // Detecta sobreposição e distribui eventos lado a lado
-    function calcularLayoutColisao(visitas) {
+    function calcularLayoutColisao(visitasAll) {
+        // Guard: ignorar visitas sem horário válido
+        const visitas = visitasAll.filter(v => v.horario && typeof v.horario === 'string' && v.horario.includes(':'));
+        if (!visitas.length) return [];
         const toMin = h => {
             const [hh, mm] = h.split(':').map(Number);
             return hh * 60 + (mm || 0);
@@ -1139,12 +1171,12 @@
             : '';
 
         return { top, altura, html: `
-            <div class="event-card card-semana st-${visita.status}" style="top:${top}px;height:${altura}px;${posStyle}" onclick="solicitarAberturaEdicaoVisita(${visita.id})">
+            <div class="event-card card-semana st-${esc(visita.status)}" style="top:${top}px;height:${altura}px;${posStyle}" onclick="solicitarAberturaEdicaoVisita(${visita.id})">
                 <div class="ec-topo">
-                    <span class="ec-hora-badge">${hora}</span>
+                    <span class="ec-hora-badge">${esc(hora)}</span>
                     <span class="ec-status-dot"></span>
                 </div>
-                ${principal ? `<div class="ec-nome">${principal}</div>` : ''}
+                ${principal ? `<div class="ec-nome">${esc(principal)}</div>` : ''}
                 ${linhasHTML}
             </div>`
         };
@@ -1190,7 +1222,7 @@
                 if (visitasDia.length > MAX_MES) {
                     const extra = visitasDia.length - MAX_MES;
                     cell.insertAdjacentHTML('beforeend',
-                        `<div class="mais-eventos" onclick="mudarModoEscopoCalendario('dia');dataFoco=new Date('${iso}T12:00:00');renderizarComponenteCalendarioBase()">+${extra} mais</div>`);
+                        `<div class="mais-eventos" onclick="irParaDia('${iso}')">+${extra} mais</div>`);
                 }
                 grid.appendChild(cell);
             }
@@ -1274,10 +1306,16 @@
                 target.style.maxHeight = '780px';
             });
 
-            // Atualiza linha vermelha a cada minuto
+            // Atualiza só a linha vermelha a cada minuto (sem re-render completo)
             clearInterval(window._ctInterval);
             window._ctInterval = setInterval(() => {
-                if (visaoAtiva !== 'mes') renderizarComponenteCalendarioBase();
+                if (visaoAtiva === 'mes') return;
+                const agora = new Date();
+                const minutos = agora.getHours() * 60 + agora.getMinutes();
+                const topLinha = 88 + (minutos - 8 * 60);
+                document.querySelectorAll('.current-time-line').forEach(el => {
+                    el.style.top = topLinha + 'px';
+                });
             }, 60000);
         }
     }
@@ -1290,6 +1328,14 @@
             col.innerHTML += `<div class="time-slot-label">${String(h).padStart(2,'0')}h</div>`;
         }
         return col;
+    }
+
+    function irParaDia(iso) {
+        dataFoco = new Date(iso + 'T12:00:00');
+        visaoAtiva = 'dia';
+        document.querySelectorAll('.btn-view').forEach(b => b.classList.remove('active'));
+        document.getElementById('btnViewdia').classList.add('active');
+        renderizarComponenteCalendarioBase(); // apenas 1 render
     }
 
     function abrirVisitaComDataHora(iso, hora) {
@@ -1532,22 +1578,26 @@
             else dadosExtras[String(cid)] = valor;
         });
 
-        if (!valido) { alert('Preencha todos os campos obrigatórios (*).'); return; }
-        if (!dadosSistema.data || !dadosSistema.horario) { alert('Data e Horário são obrigatórios.'); return; }
+        if (!valido) { exibirAlertaErroToast('Preencha todos os campos obrigatórios (*).'); return; }
+        if (!dadosSistema.data || !dadosSistema.horario) { exibirAlertaErroToast('Data e Horário são obrigatórios.'); return; }
 
         const statusEl = document.getElementById('vStatus');
         dadosSistema.status = statusEl ? statusEl.value : 'agendada';
 
         const payload = { ...dadosSistema, dados_extras: dadosExtras };
 
-        if (id) {
-            await _supabase.from('visitas').update(payload).eq('id', parseInt(id));
-        } else {
-            await _supabase.from('visitas').insert([payload]);
-        }
+        const btn = document.querySelector('#modalVisita .btn-custom');
+        setBtnLoading(btn, true);
+
+        const { error } = id
+            ? await _supabase.from('visitas').update(payload).eq('id', parseInt(id))
+            : await _supabase.from('visitas').insert([payload]);
+
+        setBtnLoading(btn, false);
+        if (error) { exibirAlertaErroToast('Erro ao salvar visita. Tente novamente.'); return; }
 
         fecharModaisAtivos();
-        exibirAlertaSucessoToast("Visita registrada com sucesso.");
+        exibirAlertaSucessoToast(id ? 'Visita atualizada!' : 'Visita agendada com sucesso!');
         await sincronizarTabelasSupabase();
     }
 
@@ -1591,8 +1641,8 @@
         tbody.innerHTML = "";
         filtradas.forEach(v => {
             const cells = colsRelatorio.map(k => {
-                const val = getValorExibicao(v, k);
-                if (k === 'status') return `<td><span class="badge-status-pill st-${v.status}">${val}</span></td>`;
+                const val = esc(getValorExibicao(v, k));
+                if (k === 'status') return `<td><span class="badge-status-pill st-${esc(v.status)}">${val}</span></td>`;
                 if (k === 'cliente') return `<td><b>${val}</b></td>`;
                 return `<td>${val || '<span style="color:var(--texto-secundario)">—</span>'}</td>`;
             }).join('');
@@ -1619,8 +1669,8 @@
         corretoresCache.forEach(c => {
             corpo.innerHTML += `<tr>
                 <td>#${c.id}</td>
-                <td><b>${c.nome}</b></td>
-                <td><span style="color:${c.status==='ativo'?'var(--st-compareceu)':'var(--st-nao-comp)'};font-weight:600;">● ${c.status.toUpperCase()}</span></td>
+                <td><b>${esc(c.nome)}</b></td>
+                <td><span style="color:${c.status==='ativo'?'var(--st-compareceu)':'var(--st-nao-comp)'};font-weight:600;">● ${esc(c.status.toUpperCase())}</span></td>
                 <td>
                     <button class="btn-outline btn-sm" onclick="analisarPerformanceIndividualCorretor(${c.id})">Analisar</button>
                     <button class="btn-outline btn-sm" onclick="inverterStatusCorretorSupabase(${c.id})">Alternar</button>
@@ -1634,32 +1684,40 @@
 
     async function gravarNovoCorretorSupabase() {
         const nome = document.getElementById("cNome").value.trim();
-        if (!nome) return;
-        await _supabase.from('corretores').insert([{ nome, status: 'ativo' }]);
+        if (!nome) { exibirAlertaErroToast('Informe o nome do corretor.'); return; }
+        const btn = document.querySelector('#modalCorretor .btn-custom');
+        setBtnLoading(btn, true);
+        const { error } = await _supabase.from('corretores').insert([{ nome, status: 'ativo' }]);
+        setBtnLoading(btn, false);
+        if (error) { exibirAlertaErroToast('Erro ao cadastrar corretor.'); return; }
         document.getElementById("cNome").value = "";
         fecharModaisAtivos();
-        exibirAlertaSucessoToast("Corretor cadastrado!");
+        exibirAlertaSucessoToast('Corretor cadastrado!');
         await sincronizarTabelasSupabase();
     }
 
     async function inverterStatusCorretorSupabase(id) {
         const c = corretoresCache.find(item => item.id === id);
         if (!c) return;
-        await _supabase.from('corretores').update({ status: c.status === 'ativo' ? 'inativo' : 'ativo' }).eq('id', id);
+        const { error } = await _supabase.from('corretores').update({ status: c.status === 'ativo' ? 'inativo' : 'ativo' }).eq('id', id);
+        if (error) { exibirAlertaErroToast('Erro ao alterar status.'); return; }
         await sincronizarTabelasSupabase();
     }
 
     async function removerCorretorSupabase(id) {
-        if (!confirm("Deseja remover este corretor permanentemente?")) return;
-        await _supabase.from('corretores').delete().eq('id', id);
+        if (!confirm('Deseja remover este corretor permanentemente?')) return;
+        const { error } = await _supabase.from('corretores').delete().eq('id', id);
+        if (error) { exibirAlertaErroToast('Erro ao remover corretor.'); return; }
         document.getElementById("painelAnaliseIndividual").style.display = "none";
+        exibirAlertaSucessoToast('Corretor removido.');
         await sincronizarTabelasSupabase();
     }
 
     function analisarPerformanceIndividualCorretor(id) {
         const c = corretoresCache.find(item => item.id === id);
         if (!c) return;
-        const vis = visitasCache.filter(v => v.corretor_id === id);
+        // Respeita o filtro de período selecionado no dashboard
+        const vis = filtrarVisitasPorPeriodoAdmin(visitasCache).filter(v => v.corretor_id === id);
         const total = vis.length;
         const comps = vis.filter(v => v.status === 'compareceu').length;
         const faltas = vis.filter(v => v.status === 'nao_compareceu').length;
@@ -1740,9 +1798,11 @@
     async function reordenarCamposSupabase() {
         const rows = document.querySelectorAll('#camposListContainer .campo-row');
         const updates = [...rows].map((r, i) => ({ id: parseInt(r.dataset.id), ordem: i + 1 }));
-        for (const u of updates) {
-            await _supabase.from('campos_visita').update({ ordem: u.ordem }).eq('id', u.id);
-        }
+        // Promise.all: todas as atualizações em paralelo, sem cascata Realtime serial
+        await Promise.all(updates.map(u =>
+            _supabase.from('campos_visita').update({ ordem: u.ordem }).eq('id', u.id)
+        ));
+        // Atualiza cache local sem re-buscar do banco
         camposCache.sort((a, b) => {
             const ai = updates.find(u => u.id === a.id)?.ordem || 0;
             const bi = updates.find(u => u.id === b.id)?.ordem || 0;
@@ -1796,13 +1856,13 @@
         }
 
         document.getElementById('modalCampo').classList.add('active');
-        lucide.createIcons();
+        lucide.createIcons({ nameAttr: 'data-lucide', attrs: {}, nodes: [document.getElementById('modalCampo')] });
     }
 
     async function salvarCampoSupabase() {
         const id = document.getElementById('campoEditId').value;
         const label = document.getElementById('campoLabel').value.trim();
-        if (!label) { alert('Informe o nome do campo.'); return; }
+        if (!label) { exibirAlertaErroToast('Informe o nome do campo.'); return; }
 
         const tipo = tipoSelecionadoCampo;
         const opcoesRaw = document.getElementById('campoOpcoes').value.trim();
@@ -1818,32 +1878,34 @@
             visivel_corretor: document.getElementById('campoVisivelCorretor').checked,
         };
 
+        const btn = document.querySelector('#modalCampo .btn-custom');
+        setBtnLoading(btn, true);
+
+        let error;
         if (id) {
             const campo = camposCache.find(c => c.id === parseInt(id));
-            if (campo?.campo_sistema) {
-                // Para campos de sistema só atualizar label, obrigatorio e visivel
-                await _supabase.from('campos_visita').update({
-                    label: payload.label,
-                    obrigatorio: payload.obrigatorio,
-                    visivel_corretor: payload.visivel_corretor
-                }).eq('id', parseInt(id));
-            } else {
-                await _supabase.from('campos_visita').update(payload).eq('id', parseInt(id));
-            }
+            const update = campo?.campo_sistema
+                ? { label: payload.label, obrigatorio: payload.obrigatorio, visivel_corretor: payload.visivel_corretor }
+                : payload;
+            ({ error } = await _supabase.from('campos_visita').update(update).eq('id', parseInt(id)));
         } else {
             const maxOrdem = camposCache.length > 0 ? Math.max(...camposCache.map(c => c.ordem)) : 0;
-            await _supabase.from('campos_visita').insert([{ ...payload, ordem: maxOrdem + 1, ativo: true }]);
+            ({ error } = await _supabase.from('campos_visita').insert([{ ...payload, ordem: maxOrdem + 1, ativo: true }]));
         }
 
+        setBtnLoading(btn, false);
+        if (error) { exibirAlertaErroToast('Erro ao salvar campo.'); return; }
+
         fecharModaisAtivos();
-        exibirAlertaSucessoToast("Campo salvo com sucesso.");
+        exibirAlertaSucessoToast('Campo salvo com sucesso.');
         await carregarCamposConfig();
     }
 
     async function excluirCampoSupabase(id) {
-        if (!confirm("Excluir este campo? Os dados existentes podem ser perdidos.")) return;
-        await _supabase.from('campos_visita').delete().eq('id', id);
-        exibirAlertaSucessoToast("Campo excluído.");
+        if (!confirm('Excluir este campo? Os dados existentes podem ser perdidos.')) return;
+        const { error } = await _supabase.from('campos_visita').delete().eq('id', id);
+        if (error) { exibirAlertaErroToast('Erro ao excluir campo.'); return; }
+        exibirAlertaSucessoToast('Campo excluído.');
         await carregarCamposConfig();
     }
 
@@ -1868,7 +1930,10 @@
         abaExibicaoAtiva = aba;
         document.querySelectorAll('.exib-tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.exib-panel').forEach(p => p.classList.remove('active'));
-        event.target.classList.add('active');
+        // Ativa a tab correta pelo atributo onclick em vez do event global (mais seguro)
+        document.querySelectorAll('.exib-tab').forEach(t => {
+            if (t.getAttribute('onclick')?.includes(`'${aba}'`)) t.classList.add('active');
+        });
         document.getElementById(`exibPanel${aba.charAt(0).toUpperCase() + aba.slice(1)}`).classList.add('active');
     }
 
@@ -2011,9 +2076,13 @@
             linhas_calendario: parseInt(document.getElementById('cfgLinhasCalendario').value) || 2,
         };
 
-        await _supabase.from('config_exibicao').update(payload).eq('id', 1);
+        const btn = document.querySelector('#subAbaExibicao .btn-custom');
+        setBtnLoading(btn, true);
+        const { error } = await _supabase.from('config_exibicao').update(payload).eq('id', 1);
+        setBtnLoading(btn, false);
+        if (error) { exibirAlertaErroToast('Erro ao salvar configurações de exibição.'); return; }
         exibicaoConfig = { ...exibicaoConfig, ...payload };
-        exibirAlertaSucessoToast("Configurações de exibição salvas!");
+        exibirAlertaSucessoToast('Configurações de exibição salvas!');
         renderizarComponenteCalendarioBase();
         reprocessarMetricasDashboard();
     }
@@ -2021,7 +2090,7 @@
     // ===== EXPORTAÇÕES =====
     function gerarExportacaoPlanilhaExcel() {
         const cols = exibicaoConfig?.campos_relatorio || ['cliente','corretor','empreendimento','data','horario','status'];
-        const dados = visitasCache.map(v => {
+        const dados = filtrarVisitasPorPeriodoAdmin(visitasCache).map(v => {
             const obj = {};
             cols.forEach(k => { obj[getLabelExibicao(k)] = getValorExibicao(v, k); });
             return obj;
@@ -2041,7 +2110,7 @@
         doc.text(`Gerado em: ${new Date().toLocaleDateString('pt-BR')}`, 14, 26);
         const cols = exibicaoConfig?.campos_relatorio || ['cliente','corretor','empreendimento','data','horario','status'];
         const cabecalho = cols.map(k => getLabelExibicao(k));
-        const linhas = visitasCache.map(v => cols.map(k => getValorExibicao(v, k)));
+        const linhas = filtrarVisitasPorPeriodoAdmin(visitasCache).map(v => cols.map(k => getValorExibicao(v, k)));
         doc.autoTable({ startY:32, head:[cabecalho], body:linhas, theme:'striped', headStyles:{ fillColor:[212,175,55], textColor:[17,17,17] } });
         doc.save("Agenda_Audaz_Relatorio.pdf");
     }
