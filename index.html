@@ -466,6 +466,7 @@
                 <button class="admin-menu-btn" id="btnMenuCorretores" onclick="navegarSubPainelAdmin('corretores')"><i data-lucide="award"></i> Performance Equipe</button>
                 <button class="admin-menu-btn" id="btnMenuCampos" onclick="navegarSubPainelAdmin('campos')"><i data-lucide="list-plus"></i> Campos da Visita</button>
                 <button class="admin-menu-btn" id="btnMenuExibicao" onclick="navegarSubPainelAdmin('exibicao')"><i data-lucide="layout-panel-left"></i> Exibição</button>
+                <button class="admin-menu-btn" id="btnMenuIntegracoes" onclick="navegarSubPainelAdmin('integracoes')"><i data-lucide="plug"></i> Integrações</button>
                 <button class="admin-menu-btn" id="btnMenuConfig" onclick="navegarSubPainelAdmin('config')"><i data-lucide="palette"></i> Aparência & Configs</button>
             </aside>
 
@@ -595,6 +596,144 @@
                         <div style="margin-top:20px;display:flex;justify-content:flex-end;">
                             <button class="btn-custom" style="padding:12px 35px;" onclick="salvarExibicaoConfig()"><i data-lucide="check"></i> Salvar Configurações de Exibição</button>
                         </div>
+                    </div>
+                </div>
+
+                <!-- INTEGRAÇÕES -->
+                <div id="subAbaIntegracoes" class="admin-sub-view" style="display:none;">
+                    <div class="data-table-box">
+                        <div class="table-title">
+                            <span>🔗 Integração com Google Planilhas</span>
+                            <span id="sheetsStatusBadge" style="font-size:12px;padding:4px 12px;border-radius:20px;font-weight:600;background:rgba(255,255,255,.05);color:var(--texto-secundario);">Não configurado</span>
+                        </div>
+
+                        <!-- STATUS SYNC -->
+                        <div style="background:var(--bg-principal);border:1px solid var(--bordas);border-radius:10px;padding:18px;margin-bottom:24px;">
+                            <div style="font-size:13px;font-weight:600;color:var(--texto-secundario);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;">Sincronizar quando status for</div>
+                            <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;">
+                                    <input type="checkbox" id="syncCompareceu" checked style="accent-color:var(--st-compareceu);width:16px;height:16px;">
+                                    <span style="color:var(--st-compareceu);font-weight:600;">🟢 Compareceu</span>
+                                </label>
+                                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;">
+                                    <input type="checkbox" id="syncNaoCompareceu" checked style="accent-color:var(--st-nao-comp);width:16px;height:16px;">
+                                    <span style="color:var(--st-nao-comp);font-weight:600;">🔴 Não Compareceu</span>
+                                </label>
+                                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;">
+                                    <input type="checkbox" id="syncAgendada" style="accent-color:var(--st-agendada);width:16px;height:16px;">
+                                    <span style="color:var(--st-agendada);font-weight:600;">🟡 Agendada</span>
+                                </label>
+                                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;">
+                                    <input type="checkbox" id="syncReagendada" style="accent-color:var(--st-reagendada);width:16px;height:16px;">
+                                    <span style="color:var(--st-reagendada);font-weight:600;">🔵 Reagendada</span>
+                                </label>
+                                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:14px;">
+                                    <input type="checkbox" id="syncCancelada" style="accent-color:var(--st-cancelada);width:16px;height:16px;">
+                                    <span style="font-weight:600;">⚫ Cancelada</span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- URL DO WEBHOOK -->
+                        <div class="form-group">
+                            <label>URL do Google Apps Script (Web App)</label>
+                            <div style="display:flex;gap:8px;">
+                                <input type="text" class="form-control" id="cfgSheetsUrl"
+                                    placeholder="https://script.google.com/macros/s/AKfy.../exec"
+                                    style="font-family:monospace;font-size:13px;">
+                                <button class="btn-outline" onclick="testarWebhookSheets()" style="flex-shrink:0;white-space:nowrap;">
+                                    <i data-lucide="zap"></i> Testar
+                                </button>
+                            </div>
+                            <p style="font-size:12px;color:var(--texto-secundario);margin-top:8px;">
+                                Cole aqui o link gerado ao publicar o Apps Script como aplicativo da web.
+                            </p>
+                        </div>
+
+                        <!-- CÓDIGO DO SCRIPT -->
+                        <div style="background:var(--bg-principal);border:1px solid var(--bordas);border-radius:10px;padding:18px;margin-bottom:20px;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                                <span style="font-size:13px;font-weight:600;">📋 Código para o Google Apps Script</span>
+                                <button class="btn-outline btn-sm" onclick="copiarCodigoScript()"><i data-lucide="copy"></i> Copiar</button>
+                            </div>
+                            <pre id="codigoAppsScript" style="background:#0d1117;color:#c9d1d9;padding:14px;border-radius:8px;font-size:11px;overflow-x:auto;line-height:1.6;white-space:pre-wrap;max-height:260px;overflow-y:auto;border:1px solid rgba(255,255,255,.08);">const ABA = 'Agendamentos';
+
+function doPost(e) {
+  try {
+    const d = JSON.parse(e.postData.contents);
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let aba = ss.getSheetByName(ABA) || ss.insertSheet(ABA);
+
+    // Cabeçalhos na primeira vez
+    if (aba.getLastRow() === 0) {
+      const cab = ['ID','Cliente','Telefone','Corretor','Data',
+                   'Horário','Local','Empreendimento','Status','Observações','Atualizado'];
+      aba.getRange(1,1,1,cab.length).setValues([cab])
+         .setFontWeight('bold').setBackground('#1a1a2e').setFontColor('#ffffff');
+      aba.setFrozenRows(1);
+    }
+
+    // Encontrar linha existente pelo ID
+    const vals = aba.getDataRange().getValues();
+    let idx = -1;
+    for (let i = 1; i < vals.length; i++) {
+      if (String(vals[i][0]) === String(d.id)) { idx = i + 1; break; }
+    }
+
+    const agora = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm');
+    const linha = [d.id, d.cliente||'', d.telefone||'', d.corretor||'',
+                   d.data||'', d.horario||'', d.local||'',
+                   d.empreendimento||'', d.status||'', d.observacoes||'', agora];
+
+    if (idx > 0) aba.getRange(idx,1,1,linha.length).setValues([linha]);
+    else         aba.appendRow(linha);
+
+    // Cor de fundo por status
+    const cores = { agendada:'#fff9c4', compareceu:'#c8e6c9',
+                    nao_compareceu:'#ffcdd2', reagendada:'#bbdefb', cancelada:'#eeeeee' };
+    const linhaFinal = idx > 0 ? idx : aba.getLastRow();
+    aba.getRange(linhaFinal,1,1,linha.length).setBackground(cores[d.status]||'#ffffff');
+
+    return ContentService.createTextOutput(JSON.stringify({ok:true}))
+      .setMimeType(ContentService.MimeType.JSON);
+
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({ok:false,erro:err.message}))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function doGet() {
+  return ContentService.createTextOutput('✓ Webhook Agenda Audaz ativo');
+}</pre>
+                        </div>
+
+                        <!-- PASSO A PASSO -->
+                        <div style="background:rgba(212,175,55,.06);border:1px solid rgba(212,175,55,.2);border-radius:10px;padding:18px;margin-bottom:24px;">
+                            <div style="font-weight:700;margin-bottom:12px;font-size:14px;">📖 Como configurar (leva 3 minutos)</div>
+                            <ol style="padding-left:18px;display:flex;flex-direction:column;gap:8px;font-size:13px;color:var(--texto-principal);line-height:1.6;">
+                                <li>Abra o <a href="https://sheets.google.com" target="_blank" style="color:var(--cor-botoes);">Google Sheets</a> e crie uma planilha nova</li>
+                                <li>No menu: <strong>Extensões → Apps Script</strong></li>
+                                <li>Apague o código existente e cole o código acima</li>
+                                <li>Clique em <strong>Implantar → Nova implantação</strong></li>
+                                <li>Tipo: <strong>Aplicativo da web</strong> · Executar como: <strong>Eu</strong> · Quem tem acesso: <strong>Qualquer pessoa</strong></li>
+                                <li>Clique <strong>Implantar</strong> e copie o URL gerado</li>
+                                <li>Cole o URL no campo acima e clique <strong>Testar</strong></li>
+                                <li>Se aparecer ✅ cole e salve</li>
+                            </ol>
+                        </div>
+
+                        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+                            <button class="btn-outline" onclick="sincronizarTodasVisitasSheets()" id="btnSyncAll">
+                                <i data-lucide="refresh-cw"></i> Sincronizar todas as visitas agora
+                            </button>
+                            <button class="btn-custom" style="padding:12px 30px;" onclick="salvarConfigSheets()">
+                                <i data-lucide="check"></i> Salvar Integração
+                            </button>
+                        </div>
+
+                        <!-- LOG DE ENVIOS -->
+                        <div style="margin-top:20px;" id="sheetsLogArea"></div>
                     </div>
                 </div>
 
@@ -1036,6 +1175,7 @@
         if (subAba === 'corretores') renderizarGerenciamentoCorretores();
         if (subAba === 'campos') renderizarSubAbaCampos();
         if (subAba === 'exibicao') renderizarSubAbaExibicao();
+        if (subAba === 'integracoes') carregarConfigSheets();
     }
 
     // ===== CALENDÁRIO =====
@@ -1613,6 +1753,10 @@
         fecharModaisAtivos();
         exibirAlertaSucessoToast(id ? 'Visita atualizada!' : 'Visita agendada com sucesso!');
         await sincronizarTabelasSupabase();
+
+        // Sincronizar com Google Sheets se status for elegível
+        const visitaSalva = visitasCache.find(v => id ? v.id === parseInt(id) : v.cliente === payload.cliente && v.data === payload.data);
+        if (visitaSalva) enviarParaSheets(visitaSalva);
     }
 
     // ===== DASHBOARD =====
@@ -2099,6 +2243,157 @@
         exibirAlertaSucessoToast('Configurações de exibição salvas!');
         renderizarComponenteCalendarioBase();
         reprocessarMetricasDashboard();
+    }
+
+    // ===== INTEGRAÇÃO GOOGLE SHEETS =====
+    let sheetsConfig = { url: '', statuses: ['compareceu', 'nao_compareceu'] };
+
+    async function carregarConfigSheets() {
+        if (!memCacheConfig) return;
+        const url = memCacheConfig.sheets_url || '';
+        const statuses = memCacheConfig.sheets_sincronizar_status || ['compareceu','nao_compareceu'];
+        sheetsConfig = { url, statuses };
+
+        const el = document.getElementById('cfgSheetsUrl');
+        if (el) el.value = url;
+
+        // Checkboxes
+        const mapa = { compareceu:'syncCompareceu', nao_compareceu:'syncNaoCompareceu', agendada:'syncAgendada', reagendada:'syncReagendada', cancelada:'syncCancelada' };
+        Object.entries(mapa).forEach(([st, id]) => {
+            const cb = document.getElementById(id);
+            if (cb) cb.checked = statuses.includes(st);
+        });
+
+        atualizarBadgeSheets(url);
+    }
+
+    function atualizarBadgeSheets(url) {
+        const badge = document.getElementById('sheetsStatusBadge');
+        if (!badge) return;
+        if (url) {
+            badge.textContent = '✅ Conectado';
+            badge.style.background = 'rgba(46,204,113,.12)';
+            badge.style.color = 'var(--st-compareceu)';
+            badge.style.border = '1px solid rgba(46,204,113,.25)';
+        } else {
+            badge.textContent = 'Não configurado';
+            badge.style.background = 'rgba(255,255,255,.05)';
+            badge.style.color = 'var(--texto-secundario)';
+            badge.style.border = '1px solid var(--bordas)';
+        }
+    }
+
+    async function salvarConfigSheets() {
+        const url = document.getElementById('cfgSheetsUrl').value.trim();
+        const mapa = { compareceu:'syncCompareceu', nao_compareceu:'syncNaoCompareceu', agendada:'syncAgendada', reagendada:'syncReagendada', cancelada:'syncCancelada' };
+        const statuses = Object.entries(mapa).filter(([st,id]) => document.getElementById(id)?.checked).map(([st]) => st);
+
+        const btn = document.querySelector('#subAbaIntegracoes .btn-custom');
+        setBtnLoading(btn, true);
+        const { error } = await _supabase.from('configuracoes').update({ sheets_url: url, sheets_sincronizar_status: statuses }).eq('id', 1);
+        setBtnLoading(btn, false);
+
+        if (error) { exibirAlertaErroToast('Erro ao salvar configuração.'); return; }
+        sheetsConfig = { url, statuses };
+        memCacheConfig = { ...memCacheConfig, sheets_url: url, sheets_sincronizar_status: statuses };
+        atualizarBadgeSheets(url);
+        exibirAlertaSucessoToast('Integração salva!');
+    }
+
+    async function testarWebhookSheets() {
+        const url = document.getElementById('cfgSheetsUrl').value.trim();
+        if (!url) { exibirAlertaErroToast('Cole a URL do Apps Script primeiro.'); return; }
+        adicionarLogSheets('⏳ Testando conexão…', 'info');
+        try {
+            const res = await fetch(url, { method:'GET', mode:'no-cors' });
+            adicionarLogSheets('✅ Conexão OK! A URL está acessível.', 'sucesso');
+            exibirAlertaSucessoToast('Webhook respondeu com sucesso!');
+        } catch(e) {
+            adicionarLogSheets('❌ Erro ao conectar: ' + e.message, 'erro');
+            exibirAlertaErroToast('Não foi possível conectar. Verifique a URL.');
+        }
+    }
+
+    async function enviarParaSheets(visita) {
+        const url = sheetsConfig.url || memCacheConfig?.sheets_url;
+        if (!url) return;
+        const statusesAtivos = sheetsConfig.statuses || memCacheConfig?.sheets_sincronizar_status || ['compareceu','nao_compareceu'];
+        if (!statusesAtivos.includes(visita.status)) return;
+
+        const corretor = corretoresCache.find(c => c.id === visita.corretor_id)?.nome || '';
+        const payload = {
+            id: visita.id,
+            cliente: visita.cliente || '',
+            telefone: visita.telefone || '',
+            corretor,
+            data: visita.data || '',
+            horario: visita.horario ? visita.horario.substring(0,5) : '',
+            local: visita.local || '',
+            empreendimento: visita.empreendimento || '',
+            status: visita.status || '',
+            observacoes: visita.observacoes || ''
+        };
+
+        try {
+            await fetch(url, {
+                method: 'POST',
+                mode: 'no-cors', // Apps Script não envia CORS headers
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            adicionarLogSheets(`✅ Enviado: ${payload.cliente} → ${payload.status}`, 'sucesso');
+        } catch(e) {
+            adicionarLogSheets(`⚠️ Falha ao enviar ${payload.cliente}: ${e.message}`, 'erro');
+        }
+    }
+
+    async function sincronizarTodasVisitasSheets() {
+        const url = sheetsConfig.url || memCacheConfig?.sheets_url;
+        if (!url) { exibirAlertaErroToast('Configure a URL do Apps Script primeiro.'); return; }
+
+        const statusesAtivos = sheetsConfig.statuses || ['compareceu','nao_compareceu'];
+        const paraEnviar = visitasCache.filter(v => statusesAtivos.includes(v.status));
+
+        if (!paraEnviar.length) { exibirAlertaSucessoToast('Nenhuma visita com os status selecionados.'); return; }
+
+        const btn = document.getElementById('btnSyncAll');
+        setBtnLoading(btn, true);
+        adicionarLogSheets(`⏳ Enviando ${paraEnviar.length} visitas…`, 'info');
+
+        let ok = 0, err = 0;
+        for (const v of paraEnviar) {
+            try {
+                const corretor = corretoresCache.find(c => c.id === v.corretor_id)?.nome || '';
+                await fetch(url, {
+                    method: 'POST', mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id:v.id, cliente:v.cliente||'', telefone:v.telefone||'', corretor, data:v.data||'', horario:v.horario?v.horario.substring(0,5):'', local:v.local||'', empreendimento:v.empreendimento||'', status:v.status||'', observacoes:v.observacoes||'' })
+                });
+                ok++;
+            } catch(e) { err++; }
+        }
+
+        setBtnLoading(btn, false);
+        adicionarLogSheets(`✅ Sincronização concluída: ${ok} enviadas${err ? `, ${err} erros` : ''}.`, ok > 0 ? 'sucesso' : 'erro');
+        exibirAlertaSucessoToast(`${ok} visitas sincronizadas com o Google Sheets!`);
+    }
+
+    function adicionarLogSheets(msg, tipo) {
+        const area = document.getElementById('sheetsLogArea');
+        if (!area) return;
+        const cores = { sucesso:'rgba(46,204,113,.12)', erro:'rgba(231,76,60,.12)', info:'rgba(255,255,255,.04)' };
+        const bordas = { sucesso:'rgba(46,204,113,.3)', erro:'rgba(231,76,60,.3)', info:'var(--bordas)' };
+        const item = document.createElement('div');
+        item.style.cssText = `padding:8px 12px;border-radius:6px;font-size:12px;margin-bottom:6px;background:${cores[tipo]||cores.info};border:1px solid ${bordas[tipo]||bordas.info};`;
+        item.textContent = `[${new Date().toLocaleTimeString('pt-BR')}] ${msg}`;
+        area.insertBefore(item, area.firstChild);
+        // Manter só os últimos 10 logs
+        while (area.children.length > 10) area.removeChild(area.lastChild);
+    }
+
+    function copiarCodigoScript() {
+        const codigo = document.getElementById('codigoAppsScript').textContent;
+        navigator.clipboard.writeText(codigo).then(() => exibirAlertaSucessoToast('Código copiado!'));
     }
 
     // ===== EXPORTAÇÕES =====
