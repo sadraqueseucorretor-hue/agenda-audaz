@@ -656,35 +656,55 @@
                                 <span style="font-size:13px;font-weight:600;">📋 Código para o Google Apps Script</span>
                                 <button class="btn-outline btn-sm" onclick="copiarCodigoScript()"><i data-lucide="copy"></i> Copiar</button>
                             </div>
-                            <pre id="codigoAppsScript" style="background:#0d1117;color:#c9d1d9;padding:14px;border-radius:8px;font-size:11px;overflow-x:auto;line-height:1.6;white-space:pre-wrap;max-height:260px;overflow-y:auto;border:1px solid rgba(255,255,255,.08);">var ABA = "Agendamentos";
+                            <pre id="codigoAppsScript" style="background:#0d1117;color:#c9d1d9;padding:14px;border-radius:8px;font-size:11px;overflow-x:auto;line-height:1.6;white-space:pre-wrap;max-height:300px;overflow-y:auto;border:1px solid rgba(255,255,255,.08);">var ABA = "Agendamentos";
 
-function doPost(e) {
+function doGet(e) {
   try {
-    var d = JSON.parse(e.postData.contents);
+    var p = e.parameter;
+
+    // Apenas ping de teste (sem parametros)
+    if (!p || !p.id) {
+      return ContentService
+        .createTextOutput("Webhook Agenda Audaz ativo")
+        .setMimeType(ContentService.MimeType.TEXT);
+    }
+
     var ss = SpreadsheetApp.getActiveSpreadsheet();
     var aba = ss.getSheetByName(ABA);
 
     if (!aba) {
       aba = ss.insertSheet(ABA);
-      var cab = ["ID","Cliente","Telefone","Corretor","Data",
-                 "Horario","Local","Empreendimento","Status","Obs","Atualizado"];
-      aba.getRange(1,1,1,cab.length).setValues([cab]).setFontWeight("bold");
+      var cab = ["ID", "Cliente", "Telefone", "Corretor", "Data",
+                 "Horario", "Local", "Empreendimento", "Status", "Obs", "Atualizado"];
+      aba.getRange(1, 1, 1, cab.length).setValues([cab]).setFontWeight("bold");
       aba.setFrozenRows(1);
     }
 
+    // Encontrar linha existente pelo ID
     var vals = aba.getDataRange().getValues();
     var idx = -1;
     for (var i = 1; i < vals.length; i++) {
-      if (String(vals[i][0]) === String(d.id)) { idx = i + 1; break; }
+      if (String(vals[i][0]) === String(p.id)) {
+        idx = i + 1;
+        break;
+      }
     }
 
     var agora = Utilities.formatDate(
       new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm"
     );
     var linha = [
-      d.id || "", d.cliente || "", d.telefone || "", d.corretor || "",
-      d.data || "", d.horario || "", d.local || "",
-      d.empreendimento || "", d.status || "", d.observacoes || "", agora
+      p.id || "",
+      p.cliente || "",
+      p.telefone || "",
+      p.corretor || "",
+      p.data || "",
+      p.horario || "",
+      p.local || "",
+      p.empreendimento || "",
+      p.status || "",
+      p.observacoes || "",
+      agora
     ];
 
     if (idx > 0) {
@@ -695,27 +715,24 @@ function doPost(e) {
     }
 
     var cores = {
-      "agendada": "#FFF9C4", "compareceu": "#C8E6C9",
-      "nao_compareceu": "#FFCDD2", "reagendada": "#BBDEFB", "cancelada": "#EEEEEE"
+      "agendada":       "#FFF9C4",
+      "compareceu":     "#C8E6C9",
+      "nao_compareceu": "#FFCDD2",
+      "reagendada":     "#BBDEFB",
+      "cancelada":      "#EEEEEE"
     };
     aba.getRange(idx, 1, 1, linha.length)
-       .setBackground(cores[d.status] || "#FFFFFF");
+       .setBackground(cores[p.status] || "#FFFFFF");
 
     return ContentService
-      .createTextOutput(JSON.stringify({ ok: true }))
-      .setMimeType(ContentService.MimeType.JSON);
+      .createTextOutput("ok")
+      .setMimeType(ContentService.MimeType.TEXT);
 
   } catch (err) {
     return ContentService
-      .createTextOutput(JSON.stringify({ ok: false, erro: err.message }))
-      .setMimeType(ContentService.MimeType.JSON);
+      .createTextOutput("erro: " + err.message)
+      .setMimeType(ContentService.MimeType.TEXT);
   }
-}
-
-function doGet(e) {
-  return ContentService
-    .createTextOutput("Webhook Agenda Audaz ativo")
-    .setMimeType(ContentService.MimeType.TEXT);
 }</pre>
                         </div>
 
@@ -2325,6 +2342,23 @@ function doGet(e) {
         }
     }
 
+    function montarUrlSheets(url, visita, corretor) {
+        // GET com params na URL — único método 100% confiável com Apps Script + no-cors
+        const p = new URLSearchParams({
+            id:            visita.id || '',
+            cliente:       visita.cliente || '',
+            telefone:      visita.telefone || '',
+            corretor:      corretor || '',
+            data:          visita.data || '',
+            horario:       visita.horario ? visita.horario.substring(0,5) : '',
+            local:         visita.local || '',
+            empreendimento: visita.empreendimento || '',
+            status:        visita.status || '',
+            observacoes:   visita.observacoes || ''
+        });
+        return url + '?' + p.toString();
+    }
+
     async function enviarParaSheets(visita) {
         const url = sheetsConfig.url || memCacheConfig?.sheets_url;
         if (!url) return;
@@ -2332,29 +2366,11 @@ function doGet(e) {
         if (!statusesAtivos.includes(visita.status)) return;
 
         const corretor = corretoresCache.find(c => c.id === visita.corretor_id)?.nome || '';
-        const payload = {
-            id: visita.id,
-            cliente: visita.cliente || '',
-            telefone: visita.telefone || '',
-            corretor,
-            data: visita.data || '',
-            horario: visita.horario ? visita.horario.substring(0,5) : '',
-            local: visita.local || '',
-            empreendimento: visita.empreendimento || '',
-            status: visita.status || '',
-            observacoes: visita.observacoes || ''
-        };
-
         try {
-            await fetch(url, {
-                method: 'POST',
-                mode: 'no-cors', // Apps Script não envia CORS headers
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-            adicionarLogSheets(`✅ Enviado: ${payload.cliente} → ${payload.status}`, 'sucesso');
+            await fetch(montarUrlSheets(url, visita, corretor), { method: 'GET', mode: 'no-cors' });
+            adicionarLogSheets('Enviado: ' + (visita.cliente||'?') + ' → ' + visita.status, 'sucesso');
         } catch(e) {
-            adicionarLogSheets(`⚠️ Falha ao enviar ${payload.cliente}: ${e.message}`, 'erro');
+            adicionarLogSheets('Falha ao enviar ' + (visita.cliente||'?') + ': ' + e.message, 'erro');
         }
     }
 
@@ -2369,17 +2385,13 @@ function doGet(e) {
 
         const btn = document.getElementById('btnSyncAll');
         setBtnLoading(btn, true);
-        adicionarLogSheets(`⏳ Enviando ${paraEnviar.length} visitas…`, 'info');
+        adicionarLogSheets('Enviando ' + paraEnviar.length + ' visitas...', 'info');
 
         let ok = 0, err = 0;
         for (const v of paraEnviar) {
             try {
                 const corretor = corretoresCache.find(c => c.id === v.corretor_id)?.nome || '';
-                await fetch(url, {
-                    method: 'POST', mode: 'no-cors',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id:v.id, cliente:v.cliente||'', telefone:v.telefone||'', corretor, data:v.data||'', horario:v.horario?v.horario.substring(0,5):'', local:v.local||'', empreendimento:v.empreendimento||'', status:v.status||'', observacoes:v.observacoes||'' })
-                });
+                await fetch(montarUrlSheets(url, v, corretor), { method: 'GET', mode: 'no-cors' });
                 ok++;
             } catch(e) { err++; }
         }
