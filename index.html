@@ -973,6 +973,7 @@ function doGet(e) {
             carregarCamposConfig(),
             carregarExibicaoConfig()
         ]);
+        carregarConfigSheets(); // carrega URL do Sheets logo no início
         configurarRealtimeSupabase();
     });
 
@@ -1782,9 +1783,21 @@ function doGet(e) {
         exibirAlertaSucessoToast(id ? 'Visita atualizada!' : 'Visita agendada com sucesso!');
         await sincronizarTabelasSupabase();
 
-        // Sincronizar com Google Sheets se status for elegível
-        const visitaSalva = visitasCache.find(v => id ? v.id === parseInt(id) : v.cliente === payload.cliente && v.data === payload.data);
-        if (visitaSalva) enviarParaSheets(visitaSalva);
+        // Sincronizar com Google Sheets — usa payload direto (sem depender do cache)
+        const corretorNome = corretoresCache.find(c => String(c.id) === String(payload.corretor_id))?.nome || '';
+        const dadosParaSheets = {
+            id: id || ('novo-' + Date.now()),
+            cliente: payload.cliente || '',
+            telefone: payload.telefone || '',
+            corretor: corretorNome,
+            data: payload.data || '',
+            horario: payload.horario ? String(payload.horario).substring(0,5) : '',
+            local: payload.local || '',
+            empreendimento: payload.empreendimento || '',
+            status: payload.status || 'agendada',
+            observacoes: payload.observacoes || ''
+        };
+        enviarParaSheetsComDados(dadosParaSheets);
     }
 
     // ===== DASHBOARD =====
@@ -2277,9 +2290,13 @@ function doGet(e) {
     let sheetsConfig = { url: '', statuses: ['compareceu', 'nao_compareceu'] };
 
     async function carregarConfigSheets() {
-        if (!memCacheConfig) return;
-        const url = memCacheConfig.sheets_url || '';
-        const statuses = memCacheConfig.sheets_sincronizar_status || ['compareceu','nao_compareceu'];
+        // Se memCacheConfig não carregou ainda, busca direto do banco
+        if (!memCacheConfig) {
+            const { data } = await _supabase.from('configuracoes').select('sheets_url,sheets_sincronizar_status').eq('id',1).single();
+            if (data) memCacheConfig = { ...memCacheConfig, ...data };
+        }
+        const url = memCacheConfig?.sheets_url || '';
+        const statuses = memCacheConfig?.sheets_sincronizar_status || ['compareceu','nao_compareceu'];
         sheetsConfig = { url, statuses };
 
         const el = document.getElementById('cfgSheetsUrl');
@@ -2331,14 +2348,48 @@ function doGet(e) {
     async function testarWebhookSheets() {
         const url = document.getElementById('cfgSheetsUrl').value.trim();
         if (!url) { exibirAlertaErroToast('Cole a URL do Apps Script primeiro.'); return; }
-        adicionarLogSheets('⏳ Testando conexão…', 'info');
+        adicionarLogSheets('Testando conexão...', 'info');
+
+        // Envia uma linha de teste real para verificar se chega na planilha
+        const dadosTeste = {
+            id: 'TESTE-' + Date.now(),
+            cliente: 'TESTE CONEXAO',
+            telefone: '(11) 99999-0000',
+            corretor: 'Sistema',
+            data: new Date().toISOString().split('T')[0],
+            horario: '10:00',
+            local: 'Teste',
+            empreendimento: 'Verificacao Webhook',
+            status: 'compareceu',
+            observacoes: 'Linha de teste - pode apagar'
+        };
+
         try {
-            const res = await fetch(url, { method:'GET', mode:'no-cors' });
-            adicionarLogSheets('✅ Conexão OK! A URL está acessível.', 'sucesso');
-            exibirAlertaSucessoToast('Webhook respondeu com sucesso!');
+            const params = new URLSearchParams(dadosTeste);
+            await fetch(url + '?' + params.toString(), { method: 'GET', mode: 'no-cors' });
+            adicionarLogSheets('Teste enviado! Verifique se apareceu uma linha "TESTE CONEXAO" na planilha (aba Agendamentos).', 'sucesso');
+            exibirAlertaSucessoToast('Teste enviado! Verifique a planilha.');
         } catch(e) {
-            adicionarLogSheets('❌ Erro ao conectar: ' + e.message, 'erro');
-            exibirAlertaErroToast('Não foi possível conectar. Verifique a URL.');
+            adicionarLogSheets('Erro: ' + e.message, 'erro');
+            exibirAlertaErroToast('Erro ao conectar. Verifique a URL.');
+        }
+    }
+
+    // Envia com objeto já montado (sem buscar no cache)
+    async function enviarParaSheetsComDados(dados) {
+        const url = sheetsConfig.url || memCacheConfig?.sheets_url;
+        if (!url) return;
+        const statusesAtivos = sheetsConfig.statuses?.length
+            ? sheetsConfig.statuses
+            : (memCacheConfig?.sheets_sincronizar_status || ['compareceu','nao_compareceu']);
+        if (!statusesAtivos.includes(dados.status)) return;
+
+        try {
+            const params = new URLSearchParams(dados);
+            await fetch(url + '?' + params.toString(), { method: 'GET', mode: 'no-cors' });
+            adicionarLogSheets('Enviado: ' + dados.cliente + ' → ' + dados.status, 'sucesso');
+        } catch(e) {
+            adicionarLogSheets('Falha: ' + e.message, 'erro');
         }
     }
 
