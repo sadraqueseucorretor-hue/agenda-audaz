@@ -656,55 +656,66 @@
                                 <span style="font-size:13px;font-weight:600;">📋 Código para o Google Apps Script</span>
                                 <button class="btn-outline btn-sm" onclick="copiarCodigoScript()"><i data-lucide="copy"></i> Copiar</button>
                             </div>
-                            <pre id="codigoAppsScript" style="background:#0d1117;color:#c9d1d9;padding:14px;border-radius:8px;font-size:11px;overflow-x:auto;line-height:1.6;white-space:pre-wrap;max-height:260px;overflow-y:auto;border:1px solid rgba(255,255,255,.08);">const ABA = 'Agendamentos';
+                            <pre id="codigoAppsScript" style="background:#0d1117;color:#c9d1d9;padding:14px;border-radius:8px;font-size:11px;overflow-x:auto;line-height:1.6;white-space:pre-wrap;max-height:260px;overflow-y:auto;border:1px solid rgba(255,255,255,.08);">var ABA = "Agendamentos";
 
 function doPost(e) {
   try {
-    const d = JSON.parse(e.postData.contents);
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    let aba = ss.getSheetByName(ABA) || ss.insertSheet(ABA);
+    var d = JSON.parse(e.postData.contents);
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var aba = ss.getSheetByName(ABA);
 
-    // Cabeçalhos na primeira vez
-    if (aba.getLastRow() === 0) {
-      const cab = ['ID','Cliente','Telefone','Corretor','Data',
-                   'Horário','Local','Empreendimento','Status','Observações','Atualizado'];
-      aba.getRange(1,1,1,cab.length).setValues([cab])
-         .setFontWeight('bold').setBackground('#1a1a2e').setFontColor('#ffffff');
+    if (!aba) {
+      aba = ss.insertSheet(ABA);
+      var cab = ["ID","Cliente","Telefone","Corretor","Data",
+                 "Horario","Local","Empreendimento","Status","Obs","Atualizado"];
+      aba.getRange(1,1,1,cab.length).setValues([cab]).setFontWeight("bold");
       aba.setFrozenRows(1);
     }
 
-    // Encontrar linha existente pelo ID
-    const vals = aba.getDataRange().getValues();
-    let idx = -1;
-    for (let i = 1; i < vals.length; i++) {
+    var vals = aba.getDataRange().getValues();
+    var idx = -1;
+    for (var i = 1; i < vals.length; i++) {
       if (String(vals[i][0]) === String(d.id)) { idx = i + 1; break; }
     }
 
-    const agora = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'dd/MM/yyyy HH:mm');
-    const linha = [d.id, d.cliente||'', d.telefone||'', d.corretor||'',
-                   d.data||'', d.horario||'', d.local||'',
-                   d.empreendimento||'', d.status||'', d.observacoes||'', agora];
+    var agora = Utilities.formatDate(
+      new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm"
+    );
+    var linha = [
+      d.id || "", d.cliente || "", d.telefone || "", d.corretor || "",
+      d.data || "", d.horario || "", d.local || "",
+      d.empreendimento || "", d.status || "", d.observacoes || "", agora
+    ];
 
-    if (idx > 0) aba.getRange(idx,1,1,linha.length).setValues([linha]);
-    else         aba.appendRow(linha);
+    if (idx > 0) {
+      aba.getRange(idx, 1, 1, linha.length).setValues([linha]);
+    } else {
+      aba.appendRow(linha);
+      idx = aba.getLastRow();
+    }
 
-    // Cor de fundo por status
-    const cores = { agendada:'#fff9c4', compareceu:'#c8e6c9',
-                    nao_compareceu:'#ffcdd2', reagendada:'#bbdefb', cancelada:'#eeeeee' };
-    const linhaFinal = idx > 0 ? idx : aba.getLastRow();
-    aba.getRange(linhaFinal,1,1,linha.length).setBackground(cores[d.status]||'#ffffff');
+    var cores = {
+      "agendada": "#FFF9C4", "compareceu": "#C8E6C9",
+      "nao_compareceu": "#FFCDD2", "reagendada": "#BBDEFB", "cancelada": "#EEEEEE"
+    };
+    aba.getRange(idx, 1, 1, linha.length)
+       .setBackground(cores[d.status] || "#FFFFFF");
 
-    return ContentService.createTextOutput(JSON.stringify({ok:true}))
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: true }))
       .setMimeType(ContentService.MimeType.JSON);
 
-  } catch(err) {
-    return ContentService.createTextOutput(JSON.stringify({ok:false,erro:err.message}))
+  } catch (err) {
+    return ContentService
+      .createTextOutput(JSON.stringify({ ok: false, erro: err.message }))
       .setMimeType(ContentService.MimeType.JSON);
   }
 }
 
-function doGet() {
-  return ContentService.createTextOutput('✓ Webhook Agenda Audaz ativo');
+function doGet(e) {
+  return ContentService
+    .createTextOutput("Webhook Agenda Audaz ativo")
+    .setMimeType(ContentService.MimeType.TEXT);
 }</pre>
                         </div>
 
