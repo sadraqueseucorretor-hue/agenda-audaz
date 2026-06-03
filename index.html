@@ -1772,32 +1772,35 @@ function doGet(e) {
         const btn = document.querySelector('#modalVisita .btn-custom');
         setBtnLoading(btn, true);
 
-        const { error } = id
-            ? await _supabase.from('visitas').update(payload).eq('id', parseInt(id))
-            : await _supabase.from('visitas').insert([payload]);
+        // Usar .select() para obter o ID real após insert
+        const { data: resultado, error } = id
+            ? await _supabase.from('visitas').update(payload).eq('id', parseInt(id)).select()
+            : await _supabase.from('visitas').insert([payload]).select();
 
         setBtnLoading(btn, false);
         if (error) { exibirAlertaErroToast('Erro ao salvar visita. Tente novamente.'); return; }
+
+        // ID real do Supabase (novo insert ou edição)
+        const visitaIdReal = id ? parseInt(id) : resultado?.[0]?.id;
 
         fecharModaisAtivos();
         exibirAlertaSucessoToast(id ? 'Visita atualizada!' : 'Visita agendada com sucesso!');
         await sincronizarTabelasSupabase();
 
-        // Sincronizar com Google Sheets — usa payload direto (sem depender do cache)
+        // Sincronizar com Google Sheets usando ID real
         const corretorNome = corretoresCache.find(c => String(c.id) === String(payload.corretor_id))?.nome || '';
-        const dadosParaSheets = {
-            id: id || ('novo-' + Date.now()),
-            cliente: payload.cliente || '',
-            telefone: payload.telefone || '',
-            corretor: corretorNome,
-            data: payload.data || '',
-            horario: payload.horario ? String(payload.horario).substring(0,5) : '',
-            local: payload.local || '',
+        enviarParaSheetsComDados({
+            id:            visitaIdReal || '',
+            cliente:       payload.cliente || '',
+            telefone:      payload.telefone || '',
+            corretor:      corretorNome,
+            data:          payload.data || '',
+            horario:       payload.horario ? String(payload.horario).substring(0,5) : '',
+            local:         payload.local || '',
             empreendimento: payload.empreendimento || '',
-            status: payload.status || 'agendada',
-            observacoes: payload.observacoes || ''
-        };
-        enviarParaSheetsComDados(dadosParaSheets);
+            status:        payload.status || 'agendada',
+            observacoes:   payload.observacoes || ''
+        });
     }
 
     // ===== DASHBOARD =====
@@ -2364,12 +2367,31 @@ function doGet(e) {
 
         const urlTeste = url + '?' + new URLSearchParams(dadosTeste).toString();
 
-        // Abre em nova aba — único jeito de ver a resposta real do Apps Script
-        window.open(urlTeste, '_blank');
+        // Tenta com CORS primeiro para ver a resposta real
+        let respostaReal = '';
+        try {
+            const res = await fetch(urlTeste, { method: 'GET', mode: 'cors', redirect: 'follow' });
+            respostaReal = await res.text();
+            if (res.ok) {
+                adicionarLogSheets(
+                    'CONEXAO OK! Resposta: "' + respostaReal.substring(0,80) + '". ' +
+                    'Verifique a aba "Agendamentos" na planilha — deve ter uma linha TESTE CONEXAO.',
+                    'sucesso'
+                );
+                exibirAlertaSucessoToast('Conexao com Google Sheets funcionando!');
+                return;
+            }
+        } catch(e) {
+            // CORS bloqueado — abre no browser para ver o que acontece
+        }
 
+        // Fallback: abre no browser para o usuario ver a resposta/autorizacao
+        window.open(urlTeste, '_blank');
         adicionarLogSheets(
-            'Abrindo teste no navegador. Se pedir autorizacao clique em "Permitir". ' +
-            'Se mostrar "Webhook Agenda Audaz ativo" ou "ok" a conexao esta funcionando.',
+            'Uma aba foi aberta no navegador. ' +
+            'SE pedir autorizacao do Google: clique em "Permitir" e tente Testar novamente. ' +
+            'SE mostrar texto "Webhook Agenda Audaz ativo": a conexao esta OK mas CORS esta bloqueado (normal). ' +
+            'SE mostrar pagina de erro: a URL esta incorreta ou o script nao foi implantado.',
             'info'
         );
     }
@@ -2377,18 +2399,52 @@ function doGet(e) {
     // Envia com objeto já montado (sem buscar no cache)
     async function enviarParaSheetsComDados(dados) {
         const url = sheetsConfig.url || memCacheConfig?.sheets_url;
-        if (!url) return;
+
+        if (!url) {
+            console.warn('[Sheets] URL nao configurada.');
+            return;
+        }
+
         const statusesAtivos = sheetsConfig.statuses?.length
             ? sheetsConfig.statuses
             : (memCacheConfig?.sheets_sincronizar_status || ['compareceu','nao_compareceu']);
-        if (!statusesAtivos.includes(dados.status)) return;
 
+        if (!statusesAtivos.includes(dados.status)) {
+            adicionarLogSheets(
+                '"' + dados.cliente + '" com status "' + dados.status + '" nao sincroniza. ' +
+                'Habilite este status em Integracoes se quiser.',
+                'info'
+            );
+            return;
+        }
+
+        const urlFinal = url + '?' + new URLSearchParams(dados).toString();
+
+        // Tenta com CORS primeiro (lemos a resposta real)
         try {
-            const params = new URLSearchParams(dados);
-            await fetch(url + '?' + params.toString(), { method: 'GET', mode: 'no-cors' });
-            adicionarLogSheets('Enviado: ' + dados.cliente + ' → ' + dados.status, 'sucesso');
+            const res = await fetch(urlFinal, { method: 'GET', mode: 'cors', redirect: 'follow' });
+            const texto = await res.text();
+            if (res.ok) {
+                adicionarLogSheets('Planilha atualizada: ' + dados.cliente + ' → ' + dados.status, 'sucesso');
+            } else {
+                adicionarLogSheets('Erro do script (HTTP ' + res.status + '): ' + texto.substring(0, 120), 'erro');
+            }
+            return;
+        } catch(errCors) {
+            console.warn('[Sheets] CORS bloqueado, usando no-cors:', errCors.message);
+        }
+
+        // Fallback: no-cors (nao le resposta mas o request chega)
+        try {
+            await fetch(urlFinal, { method: 'GET', mode: 'no-cors' });
+            adicionarLogSheets(
+                'Enviado (sem confirmacao): ' + dados.cliente + ' → ' + dados.status +
+                '. Verifique a planilha.',
+                'sucesso'
+            );
         } catch(e) {
-            adicionarLogSheets('Falha: ' + e.message, 'erro');
+            adicionarLogSheets('Falha total: ' + e.message, 'erro');
+            exibirAlertaErroToast('Erro ao enviar para o Google Sheets. Verifique em Integracoes.');
         }
     }
 
