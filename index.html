@@ -656,81 +656,65 @@
                                 <span style="font-size:13px;font-weight:600;">📋 Código para o Google Apps Script</span>
                                 <button class="btn-outline btn-sm" onclick="copiarCodigoScript()"><i data-lucide="copy"></i> Copiar</button>
                             </div>
-                            <pre id="codigoAppsScript" style="background:#0d1117;color:#c9d1d9;padding:14px;border-radius:8px;font-size:11px;overflow-x:auto;line-height:1.6;white-space:pre-wrap;max-height:300px;overflow-y:auto;border:1px solid rgba(255,255,255,.08);">var ABA = "Agendamentos";
+                            <pre id="codigoAppsScript" style="background:#0d1117;color:#c9d1d9;padding:14px;border-radius:8px;font-size:11px;overflow-x:auto;line-height:1.6;white-space:pre-wrap;max-height:340px;overflow-y:auto;border:1px solid rgba(255,255,255,.08);">var ABA = "Agendamentos";
 
 function doGet(e) {
   try {
     var p = e.parameter;
 
-    // Apenas ping de teste (sem parametros)
     if (!p || !p.id) {
-      return ContentService
-        .createTextOutput("Webhook Agenda Audaz ativo")
+      return ContentService.createTextOutput("ok-ativo")
         .setMimeType(ContentService.MimeType.TEXT);
     }
 
-    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var ss  = SpreadsheetApp.getActiveSpreadsheet();
     var aba = ss.getSheetByName(ABA);
+
+    // Colunas e cabecalhos dinamicos (enviados pela Agenda Audaz)
+    var colunas = p._colunas ? p._colunas.split(",") : ["id","cliente","telefone","corretor","data","horario","empreendimento","status"];
+    var headers = p._headers ? p._headers.split(",") : colunas.slice();
+    headers.push("Atualizado");
 
     if (!aba) {
       aba = ss.insertSheet(ABA);
-      var cab = ["ID", "Cliente", "Telefone", "Corretor", "Data",
-                 "Horario", "Local", "Empreendimento", "Status", "Obs", "Atualizado"];
-      aba.getRange(1, 1, 1, cab.length).setValues([cab]).setFontWeight("bold");
+      aba.getRange(1,1,1,headers.length).setValues([headers])
+         .setFontWeight("bold").setBackground("#1a1a2e").setFontColor("#ffffff");
+      aba.setFrozenRows(1);
+    } else if (aba.getLastRow() === 0) {
+      aba.getRange(1,1,1,headers.length).setValues([headers])
+         .setFontWeight("bold").setBackground("#1a1a2e").setFontColor("#ffffff");
       aba.setFrozenRows(1);
     }
 
     // Encontrar linha existente pelo ID
-    var vals = aba.getDataRange().getValues();
-    var idx = -1;
+    var idCol = colunas.indexOf("id");
+    var vals  = aba.getDataRange().getValues();
+    var idx   = -1;
     for (var i = 1; i < vals.length; i++) {
-      if (String(vals[i][0]) === String(p.id)) {
-        idx = i + 1;
-        break;
+      if (String(vals[i][idCol >= 0 ? idCol : 0]) === String(p.id)) {
+        idx = i + 1; break;
       }
     }
 
-    var agora = Utilities.formatDate(
-      new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm"
-    );
-    var linha = [
-      p.id || "",
-      p.cliente || "",
-      p.telefone || "",
-      p.corretor || "",
-      p.data || "",
-      p.horario || "",
-      p.local || "",
-      p.empreendimento || "",
-      p.status || "",
-      p.observacoes || "",
-      agora
-    ];
+    var agora = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm");
+    var linha = colunas.map(function(col) { return p[col] || ""; });
+    linha.push(agora);
 
     if (idx > 0) {
-      aba.getRange(idx, 1, 1, linha.length).setValues([linha]);
+      aba.getRange(idx,1,1,linha.length).setValues([linha]);
     } else {
       aba.appendRow(linha);
       idx = aba.getLastRow();
     }
 
-    var cores = {
-      "agendada":       "#FFF9C4",
-      "compareceu":     "#C8E6C9",
-      "nao_compareceu": "#FFCDD2",
-      "reagendada":     "#BBDEFB",
-      "cancelada":      "#EEEEEE"
-    };
-    aba.getRange(idx, 1, 1, linha.length)
-       .setBackground(cores[p.status] || "#FFFFFF");
+    var cores = { "agendada":"#FFF9C4","compareceu":"#C8E6C9",
+                  "nao_compareceu":"#FFCDD2","reagendada":"#BBDEFB","cancelada":"#EEEEEE" };
+    aba.getRange(idx,1,1,linha.length).setBackground(cores[p.status] || "#FFFFFF");
 
-    return ContentService
-      .createTextOutput("ok")
-      .setMimeType(ContentService.MimeType.TEXT);
+    return ContentService.createTextOutput("ok").setMimeType(ContentService.MimeType.TEXT);
 
-  } catch (err) {
-    return ContentService
-      .createTextOutput("erro: " + err.message)
+  } catch(err) {
+    return ContentService.createTextOutput("erro: " + err.message)
       .setMimeType(ContentService.MimeType.TEXT);
   }
 }</pre>
@@ -751,7 +735,29 @@ function doGet(e) {
                             </ol>
                         </div>
 
-                        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+                        <!-- CONFIGURADOR DE COLUNAS -->
+                        <div style="margin-top:24px;padding-top:24px;border-top:1px solid var(--bordas);">
+                            <div style="font-size:14px;font-weight:700;margin-bottom:4px;">📊 Colunas da Planilha</div>
+                            <p style="font-size:13px;color:var(--texto-secundario);margin-bottom:16px;">
+                                Escolha quais campos aparecem na planilha e arraste para definir a ordem das colunas.
+                            </p>
+                            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;" id="sheetsColunaLayout">
+                                <div>
+                                    <div class="exib-col-title">Disponíveis</div>
+                                    <div class="exib-field-list" id="sheetsDisp"
+                                        ondragover="event.preventDefault()"
+                                        ondrop="sheetsColunasDrop(event,'disp')"></div>
+                                </div>
+                                <div>
+                                    <div class="exib-col-title">Na planilha (em ordem)</div>
+                                    <div class="exib-field-list" id="sheetsSel"
+                                        ondragover="event.preventDefault()"
+                                        ondrop="sheetsColunasDrop(event,'sel')"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-top:24px;">
                             <button class="btn-outline" onclick="sincronizarTodasVisitasSheets()" id="btnSyncAll">
                                 <i data-lucide="refresh-cw"></i> Sincronizar todas as visitas agora
                             </button>
@@ -2290,7 +2296,22 @@ function doGet(e) {
     }
 
     // ===== INTEGRAÇÃO GOOGLE SHEETS =====
-    let sheetsConfig = { url: '', statuses: ['compareceu', 'nao_compareceu'] };
+    let sheetsConfig = { url: '', statuses: ['compareceu', 'nao_compareceu'], campos: [] };
+
+    // Todos os campos disponíveis para a planilha
+    const SHEETS_CAMPOS_SISTEMA = [
+        { key:'id',             label:'ID' },
+        { key:'cliente',        label:'Cliente' },
+        { key:'telefone',       label:'Telefone' },
+        { key:'corretor',       label:'Corretor' },
+        { key:'data',           label:'Data' },
+        { key:'horario',        label:'Horário' },
+        { key:'local',          label:'Local' },
+        { key:'empreendimento', label:'Empreendimento' },
+        { key:'status',         label:'Status' },
+        { key:'observacoes',    label:'Observações' },
+    ];
+    const SHEETS_CAMPOS_PADRAO = ['id','cliente','telefone','corretor','data','horario','empreendimento','status'];
 
     async function carregarConfigSheets() {
         // Se memCacheConfig não carregou ainda, busca direto do banco
@@ -2298,9 +2319,10 @@ function doGet(e) {
             const { data } = await _supabase.from('configuracoes').select('sheets_url,sheets_sincronizar_status').eq('id',1).single();
             if (data) memCacheConfig = { ...memCacheConfig, ...data };
         }
-        const url = memCacheConfig?.sheets_url || '';
+        const url      = memCacheConfig?.sheets_url || '';
         const statuses = memCacheConfig?.sheets_sincronizar_status || ['compareceu','nao_compareceu'];
-        sheetsConfig = { url, statuses };
+        const campos   = memCacheConfig?.sheets_campos || SHEETS_CAMPOS_PADRAO;
+        sheetsConfig   = { url, statuses, campos };
 
         const el = document.getElementById('cfgSheetsUrl');
         if (el) el.value = url;
@@ -2313,6 +2335,7 @@ function doGet(e) {
         });
 
         atualizarBadgeSheets(url);
+        renderizarConfiguradorColunas(campos);
     }
 
     function atualizarBadgeSheets(url) {
@@ -2331,19 +2354,137 @@ function doGet(e) {
         }
     }
 
+    // ===== CONFIGURADOR DE COLUNAS DA PLANILHA =====
+    function getTodosOsCamposSheets() {
+        const sistema = SHEETS_CAMPOS_SISTEMA;
+        const custom  = camposCache.filter(c => !c.campo_sistema).map(c => ({ key: 'extra_' + c.id, label: c.label }));
+        return [...sistema, ...custom];
+    }
+
+    function renderizarConfiguradorColunas(selecionados) {
+        const dispEl = document.getElementById('sheetsDisp');
+        const selEl  = document.getElementById('sheetsSel');
+        if (!dispEl || !selEl) return;
+
+        const todos       = getTodosOsCamposSheets();
+        const disponiveis = todos.filter(c => !selecionados.includes(c.key));
+
+        dispEl.innerHTML = '';
+        selEl.innerHTML  = '';
+
+        disponiveis.forEach(c => dispEl.appendChild(criarSheetsColItem(c, 'disp')));
+        selecionados.forEach(key => {
+            const c = todos.find(t => t.key === key);
+            if (c) selEl.appendChild(criarSheetsColItem(c, 'sel'));
+        });
+    }
+
+    function criarSheetsColItem(campo, lado) {
+        const item = document.createElement('div');
+        item.className = 'exib-field-item';
+        item.draggable = true;
+        item.dataset.key  = campo.key;
+        item.dataset.lado = lado;
+        item.innerHTML = `
+            <span class="drag-handle">⠿</span>
+            <span style="flex:1;font-size:13px;">${campo.label}</span>
+            <button class="exib-move-btn" onclick="sheetsColunaMover('${campo.key}','${lado}')"
+                title="${lado==='disp'?'Adicionar à planilha':'Remover da planilha'}">
+                ${lado === 'disp' ? '→' : '←'}
+            </button>`;
+
+        item.addEventListener('dragstart', e => {
+            dragSrcEl = item;
+            e.dataTransfer.effectAllowed = 'move';
+            setTimeout(() => item.classList.add('dragging'), 0);
+        });
+        item.addEventListener('dragend',  () => item.classList.remove('dragging'));
+        item.addEventListener('dragover',  e => { e.preventDefault(); item.classList.add('drag-over'); });
+        item.addEventListener('dragleave', () => item.classList.remove('drag-over'));
+        item.addEventListener('drop', e => {
+            e.preventDefault(); item.classList.remove('drag-over');
+            if (!dragSrcEl || dragSrcEl === item) return;
+            const lista = item.parentElement;
+            const all   = [...lista.querySelectorAll('.exib-field-item')];
+            const si = all.indexOf(dragSrcEl);
+            const ti = all.indexOf(item);
+            if (si < ti) lista.insertBefore(dragSrcEl, item.nextSibling);
+            else         lista.insertBefore(dragSrcEl, item);
+        });
+
+        return item;
+    }
+
+    function sheetsColunaMover(key, ladoAtual) {
+        const novoLado = ladoAtual === 'disp' ? 'sel' : 'disp';
+        const todos    = getTodosOsCamposSheets();
+        const campo    = todos.find(c => c.key === key);
+        if (!campo) return;
+        const src  = document.getElementById(ladoAtual === 'disp' ? 'sheetsDisp' : 'sheetsSel');
+        const dest = document.getElementById(novoLado  === 'disp' ? 'sheetsDisp' : 'sheetsSel');
+        const el   = src?.querySelector(`[data-key="${key}"]`);
+        if (el) { src.removeChild(el); dest.appendChild(criarSheetsColItem(campo, novoLado)); }
+    }
+
+    function sheetsColunasDrop(e, ladoDrop) {
+        e.preventDefault();
+        if (!dragSrcEl) return;
+        const ladoSrc = dragSrcEl.dataset.lado;
+        if (ladoSrc === ladoDrop) return;
+        sheetsColunaMover(dragSrcEl.dataset.key, ladoSrc);
+    }
+
+    function lerColunasSheetsSelecionadas() {
+        return [...document.querySelectorAll('#sheetsSel [data-key]')].map(el => el.dataset.key);
+    }
+
+    // Monta o label amigável de cada campo
+    function getLabelCampoSheets(key) {
+        const todos = getTodosOsCamposSheets();
+        return todos.find(c => c.key === key)?.label || key;
+    }
+
+    // Pega o valor de um campo da visita pelo key
+    function getValorCampoSheets(visita, key, corretorNome) {
+        const mapa = {
+            id:             visita.id || '',
+            cliente:        visita.cliente || '',
+            telefone:       visita.telefone || '',
+            corretor:       corretorNome || '',
+            data:           visita.data || '',
+            horario:        visita.horario ? String(visita.horario).substring(0,5) : '',
+            local:          visita.local || '',
+            empreendimento: visita.empreendimento || '',
+            status:         visita.status || '',
+            observacoes:    visita.observacoes || ''
+        };
+        if (key in mapa) return mapa[key];
+        // Campo customizado (extra_ID)
+        if (key.startsWith('extra_')) {
+            const campoId = key.replace('extra_', '');
+            return (visita.dados_extras || {})[campoId] || '';
+        }
+        return '';
+    }
+
     async function salvarConfigSheets() {
         const url = document.getElementById('cfgSheetsUrl').value.trim();
         const mapa = { compareceu:'syncCompareceu', nao_compareceu:'syncNaoCompareceu', agendada:'syncAgendada', reagendada:'syncReagendada', cancelada:'syncCancelada' };
         const statuses = Object.entries(mapa).filter(([st,id]) => document.getElementById(id)?.checked).map(([st]) => st);
+        const campos   = lerColunasSheetsSelecionadas();
 
         const btn = document.querySelector('#subAbaIntegracoes .btn-custom');
         setBtnLoading(btn, true);
-        const { error } = await _supabase.from('configuracoes').update({ sheets_url: url, sheets_sincronizar_status: statuses }).eq('id', 1);
+        const { error } = await _supabase.from('configuracoes').update({
+            sheets_url: url,
+            sheets_sincronizar_status: statuses,
+            sheets_campos: campos
+        }).eq('id', 1);
         setBtnLoading(btn, false);
 
         if (error) { exibirAlertaErroToast('Erro ao salvar configuração.'); return; }
-        sheetsConfig = { url, statuses };
-        memCacheConfig = { ...memCacheConfig, sheets_url: url, sheets_sincronizar_status: statuses };
+        sheetsConfig = { url, statuses, campos };
+        memCacheConfig = { ...memCacheConfig, sheets_url: url, sheets_sincronizar_status: statuses, sheets_campos: campos };
         atualizarBadgeSheets(url);
         exibirAlertaSucessoToast('Integração salva!');
     }
@@ -2418,7 +2559,19 @@ function doGet(e) {
             return;
         }
 
-        const urlFinal = url + '?' + new URLSearchParams(dados).toString();
+        // Monta params respeitando a ordem e os campos configurados
+        const colunas = sheetsConfig.campos?.length ? sheetsConfig.campos : SHEETS_CAMPOS_PADRAO;
+        const params  = new URLSearchParams();
+        params.append('_colunas', colunas.join(','));
+        params.append('_headers', colunas.map(k => getLabelCampoSheets(k)).join(','));
+        colunas.forEach(key => {
+            const val = dados[key] !== undefined ? dados[key] : (dados['extra_' === key.substring(0,6) ? key.replace('extra_','') : ''] || '');
+            params.append(key, val !== null && val !== undefined ? String(val) : '');
+        });
+        // Sempre inclui ID para identificar a linha
+        if (!params.has('id')) params.append('id', dados.id || '');
+
+        const urlFinal = url + '?' + params.toString();
 
         // Tenta com CORS primeiro (lemos a resposta real)
         try {
