@@ -2348,31 +2348,30 @@ function doGet(e) {
     async function testarWebhookSheets() {
         const url = document.getElementById('cfgSheetsUrl').value.trim();
         if (!url) { exibirAlertaErroToast('Cole a URL do Apps Script primeiro.'); return; }
-        adicionarLogSheets('Testando conexão...', 'info');
 
-        // Envia uma linha de teste real para verificar se chega na planilha
         const dadosTeste = {
             id: 'TESTE-' + Date.now(),
             cliente: 'TESTE CONEXAO',
-            telefone: '(11) 99999-0000',
+            telefone: '11999990000',
             corretor: 'Sistema',
             data: new Date().toISOString().split('T')[0],
             horario: '10:00',
             local: 'Teste',
-            empreendimento: 'Verificacao Webhook',
+            empreendimento: 'Verificacao',
             status: 'compareceu',
-            observacoes: 'Linha de teste - pode apagar'
+            observacoes: 'Pode apagar'
         };
 
-        try {
-            const params = new URLSearchParams(dadosTeste);
-            await fetch(url + '?' + params.toString(), { method: 'GET', mode: 'no-cors' });
-            adicionarLogSheets('Teste enviado! Verifique se apareceu uma linha "TESTE CONEXAO" na planilha (aba Agendamentos).', 'sucesso');
-            exibirAlertaSucessoToast('Teste enviado! Verifique a planilha.');
-        } catch(e) {
-            adicionarLogSheets('Erro: ' + e.message, 'erro');
-            exibirAlertaErroToast('Erro ao conectar. Verifique a URL.');
-        }
+        const urlTeste = url + '?' + new URLSearchParams(dadosTeste).toString();
+
+        // Abre em nova aba — único jeito de ver a resposta real do Apps Script
+        window.open(urlTeste, '_blank');
+
+        adicionarLogSheets(
+            'Abrindo teste no navegador. Se pedir autorizacao clique em "Permitir". ' +
+            'Se mostrar "Webhook Agenda Audaz ativo" ou "ok" a conexao esta funcionando.',
+            'info'
+        );
     }
 
     // Envia com objeto já montado (sem buscar no cache)
