@@ -291,7 +291,9 @@
             .event-card.card-mes { padding:3px 5px 2px; }
             .event-card.card-mes .ec-hora { font-size:9px; }
             .event-card.card-mes .ec-nome { font-size:10px; }
-            .event-card.card-mes .ec-sub  { display:none; }
+            .event-card.card-mes .ec-sub  { font-size:9px; }
+            /* No mobile mostra no máximo 2 linhas secundárias para não estourar */
+            .event-card.card-mes .ec-sub:nth-of-type(n+3) { display:none; }
 
             /* Semana/Dia — scroll horizontal na semana */
             .calendar-wrapper { overflow-x:auto; }
@@ -1235,6 +1237,10 @@ function doGet(e) {
     function dispararFiltrosCalendario() { renderizarComponenteCalendarioBase(); }
     function isoStr(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
 
+    const STATUS_LABEL = {
+        agendada: 'Agendada', compareceu: 'Compareceu', nao_compareceu: 'Não Compareceu',
+        reagendada: 'Reagendada', cancelada: 'Cancelada'
+    };
     function getValorExibicao(visita, key) {
         const mapa = {
             'cliente': visita.cliente || '',
@@ -1244,7 +1250,7 @@ function doGet(e) {
             'local': visita.local || '',
             'empreendimento': visita.empreendimento || '',
             'observacoes': visita.observacoes || '',
-            'status': visita.status || '',
+            'status': STATUS_LABEL[visita.status] || visita.status || '',
             'corretor': corretoresCache.find(c => c.id === visita.corretor_id)?.nome || '',
         };
         if (key in mapa) return mapa[key];
@@ -1266,24 +1272,31 @@ function doGet(e) {
     function montarCardMes(visita) {
         const cfg = exibicaoConfig || {};
         const campos = cfg.campos_calendario || ['horario', 'cliente'];
-        const maxLinhas = cfg.linhas_calendario || 2;
         const tamanho = cfg.card_tamanho || 'medio';
 
+        const temHora = campos.includes('horario');
         const hora = visita.horario ? visita.horario.substring(0,5) : '';
 
-        // Pega todos os campos exceto horario (que vira o badge)
+        // Campos de conteúdo (todos exceto horário, que vira o badge no topo)
         const camposConteudo = campos.filter(k => k !== 'horario');
-        const vals = camposConteudo.map(k => getValorExibicao(visita, k)).filter(Boolean);
+        const itens = camposConteudo
+            .map(k => getValorExibicao(visita, k))
+            .filter(v => v !== '' && v !== null && v !== undefined);
 
-        const principal = vals[0] || '';
-        const secundarios = vals.slice(1, maxLinhas).join(' · ');
+        // 1º campo vira título em destaque, os demais cada um em sua linha
+        const principal = itens[0] || '';
+        const secundarios = itens.slice(1);
 
         const tamanhoClass = tamanho !== 'medio' ? ` card-${tamanho}` : '';
 
+        const linhasSecHTML = secundarios
+            .map(v => `<div class="ec-sub">${esc(v)}</div>`)
+            .join('');
+
         return `<div class="event-card card-mes st-${esc(visita.status)}${tamanhoClass}" onclick="solicitarAberturaEdicaoVisita(${visita.id})">
-            ${hora ? `<div class="ec-hora">${esc(hora)}</div>` : ''}
+            ${temHora && hora ? `<div class="ec-hora">${esc(hora)}</div>` : ''}
             ${principal ? `<div class="ec-nome">${esc(principal)}</div>` : ''}
-            ${secundarios ? `<div class="ec-sub">${esc(secundarios)}</div>` : ''}
+            ${linhasSecHTML}
         </div>`;
     }
 
