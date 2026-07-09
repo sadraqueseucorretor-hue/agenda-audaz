@@ -967,13 +967,10 @@ function doGet(e) {
     document.addEventListener("DOMContentLoaded", async () => {
         lucide.createIcons();
 
-        // Mobile: começa na visão "dia" por padrão
-        if (window.innerWidth < 768) {
-            visaoAtiva = 'dia';
-            document.querySelectorAll('.btn-view').forEach(b => b.classList.remove('active'));
-            const btnDia = document.getElementById('btnViewdia');
-            if (btnDia) btnDia.classList.add('active');
-        }
+        // Sempre inicia na visão "mês" (desktop e mobile)
+        visaoAtiva = 'mes';
+        document.querySelectorAll('.btn-view').forEach(b => b.classList.remove('active'));
+        document.getElementById('btnViewmes')?.classList.add('active');
 
         await Promise.all([
             carregarConfiguracoesPlataforma(),
