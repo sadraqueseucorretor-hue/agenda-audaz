@@ -1039,7 +1039,7 @@ function doGet(e) {
 
         const [resCorr, resVis] = await Promise.all([
             _supabase.from('corretores').select('*').order('nome'),
-            _supabase.from('visitas').select('*').order('data', { ascending: false })
+            _supabase.from('visitas').select('*').order('data', { ascending: true }).order('horario', { ascending: true })
         ]);
 
         if (resCorr.error) { exibirAlertaErroToast('Erro ao carregar corretores.'); return; }
@@ -2661,7 +2661,14 @@ function doGet(e) {
         if (!url) { exibirAlertaErroToast('Configure a URL do Apps Script primeiro.'); return; }
 
         const statusesAtivos = sheetsConfig.statuses || ['compareceu','nao_compareceu'];
-        const paraEnviar = visitasCache.filter(v => statusesAtivos.includes(v.status));
+        // Envia da data mais ANTIGA para a mais NOVA (ordem cronológica na planilha)
+        const paraEnviar = visitasCache
+            .filter(v => statusesAtivos.includes(v.status))
+            .sort((a, b) => {
+                const chaveA = (a.data || '') + ' ' + (a.horario || '');
+                const chaveB = (b.data || '') + ' ' + (b.horario || '');
+                return chaveA < chaveB ? -1 : chaveA > chaveB ? 1 : 0;
+            });
 
         if (!paraEnviar.length) { exibirAlertaSucessoToast('Nenhuma visita com os status selecionados.'); return; }
 
