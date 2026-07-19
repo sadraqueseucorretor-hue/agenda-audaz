@@ -677,6 +677,7 @@ function doGet(e) {
     var colunas = p._colunas ? p._colunas.split("|") : ["id","cliente","telefone","corretor","data","horario","empreendimento","status"];
     var headers = p._headers ? p._headers.split("|") : colunas.slice();
     headers.push("Atualizado");
+    headers.push("Data de Cadastro");
 
     if (!aba) aba = ss.insertSheet(ABA);
 
@@ -711,6 +712,7 @@ function doGet(e) {
     var agora = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "dd/MM/yyyy HH:mm");
     var linha = colunas.map(function(col) { return p[col] || ""; });
     linha.push(agora);
+    linha.push(p._cadastro || "");
 
     if (idx > 0) {
       aba.getRange(idx,1,1,linha.length).setValues([linha]);
@@ -1839,7 +1841,11 @@ function doGet(e) {
         // Sincronizar com Google Sheets usando ID real
         const corretorNome = corretoresCache.find(c => String(c.id) === String(payload.corretor_id))?.nome || '';
         enviarParaSheetsComDados(
-            montarDadosSheets({ ...payload, id: visitaIdReal }, corretorNome)
+            montarDadosSheets({
+                ...payload,
+                id: visitaIdReal,
+                created_at: resultado?.[0]?.created_at
+            }, corretorNome)
         );
     }
 
@@ -2572,6 +2578,15 @@ function doGet(e) {
     }
 
     // Envia com objeto já montado (sem buscar no cache)
+    // Formata timestamp do banco (created_at) para dd/mm/aaaa HH:MM no horário local
+    function formatarDataHoraBR(ts) {
+        if (!ts) return '';
+        const d = new Date(ts);
+        if (isNaN(d)) return '';
+        const p = n => String(n).padStart(2, '0');
+        return `${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+    }
+
     // Monta o payload completo de uma visita, incluindo os campos customizados (extra_ID)
     function montarDadosSheets(visita, corretorNome) {
         const dados = {
@@ -2592,6 +2607,8 @@ function doGet(e) {
             const v = extras[String(c.id)];
             dados['extra_' + c.id] = Array.isArray(v) ? v.join(', ') : (v ?? '');
         });
+        // Coluna fixa no fim da planilha (depois de "Atualizado"), fora da config de colunas
+        dados._cadastro = formatarDataHoraBR(visita.created_at);
         return dados;
     }
 
@@ -2628,6 +2645,8 @@ function doGet(e) {
         });
         // Sempre inclui ID para identificar a linha
         if (!params.has('id')) params.append('id', dados.id || '');
+        // Data de cadastro: coluna fixa no fim, após "Atualizado"
+        params.append('_cadastro', dados._cadastro || '');
 
         const urlFinal = url + '?' + params.toString();
 
