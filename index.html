@@ -1721,6 +1721,11 @@ function doGet(e) {
 
         // Status só no modo edição
         if (ehEdicao) {
+            const jaCancelada = visita.status === 'cancelada';
+            // "Cancelada" é exclusivo do proprietário. Corretores não podem cancelar.
+            // Se a visita já está cancelada, a opção aparece para não perder o valor ao salvar.
+            const podeCancelar = adminAutenticado || jaCancelada;
+
             const grp = document.createElement('div'); grp.className = 'form-group';
             grp.innerHTML = `<label>Status Operacional</label>
                 <select class="form-control" id="vStatus">
@@ -1728,10 +1733,15 @@ function doGet(e) {
                     <option value="compareceu">🟢 Compareceu</option>
                     <option value="nao_compareceu">🔴 Não Compareceu</option>
                     <option value="reagendada">🔵 Reagendada</option>
-                    <option value="cancelada">⚫ Cancelada</option>
-                </select>`;
+                    ${podeCancelar ? '<option value="cancelada">⚫ Cancelada</option>' : ''}
+                </select>
+                ${!adminAutenticado ? '<p style="font-size:11px;color:var(--texto-secundario);margin-top:6px;">O cancelamento é feito apenas pelo Proprietário.</p>' : ''}`;
             container.appendChild(grp);
-            container.querySelector('#vStatus').value = visita.status || 'agendada';
+
+            const sel = container.querySelector('#vStatus');
+            sel.value = visita.status || 'agendada';
+            // Corretor não altera uma visita já cancelada
+            if (jaCancelada && !adminAutenticado) sel.disabled = true;
         }
     }
 
@@ -1796,6 +1806,15 @@ function doGet(e) {
 
         const statusEl = document.getElementById('vStatus');
         dadosSistema.status = statusEl ? statusEl.value : 'agendada';
+
+        // Cancelamento é exclusivo do proprietário
+        if (dadosSistema.status === 'cancelada' && !adminAutenticado) {
+            const visitaOriginal = id ? visitasCache.find(v => v.id === parseInt(id)) : null;
+            if (visitaOriginal?.status !== 'cancelada') {
+                exibirAlertaErroToast('Apenas o Proprietário pode cancelar uma visita.');
+                return;
+            }
+        }
 
         const payload = { ...dadosSistema, dados_extras: dadosExtras };
 
