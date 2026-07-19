@@ -673,8 +673,9 @@ function doGet(e) {
     var aba = ss.getSheetByName(ABA);
 
     // Colunas e cabecalhos dinamicos (enviados pela Agenda Audaz)
-    var colunas = p._colunas ? p._colunas.split(",") : ["id","cliente","telefone","corretor","data","horario","empreendimento","status"];
-    var headers = p._headers ? p._headers.split(",") : colunas.slice();
+    // Separador "|" para suportar labels que contenham virgula
+    var colunas = p._colunas ? p._colunas.split("|") : ["id","cliente","telefone","corretor","data","horario","empreendimento","status"];
+    var headers = p._headers ? p._headers.split("|") : colunas.slice();
     headers.push("Atualizado");
 
     if (!aba) aba = ss.insertSheet(ABA);
@@ -1818,18 +1819,9 @@ function doGet(e) {
 
         // Sincronizar com Google Sheets usando ID real
         const corretorNome = corretoresCache.find(c => String(c.id) === String(payload.corretor_id))?.nome || '';
-        enviarParaSheetsComDados({
-            id:            visitaIdReal || '',
-            cliente:       payload.cliente || '',
-            telefone:      payload.telefone || '',
-            corretor:      corretorNome,
-            data:          payload.data || '',
-            horario:       payload.horario ? String(payload.horario).substring(0,5) : '',
-            local:         payload.local || '',
-            empreendimento: payload.empreendimento || '',
-            status:        payload.status || 'agendada',
-            observacoes:   payload.observacoes || ''
-        });
+        enviarParaSheetsComDados(
+            montarDadosSheets({ ...payload, id: visitaIdReal }, corretorNome)
+        );
     }
 
     // ===== DASHBOARD =====
@@ -2561,6 +2553,29 @@ function doGet(e) {
     }
 
     // Envia com objeto já montado (sem buscar no cache)
+    // Monta o payload completo de uma visita, incluindo os campos customizados (extra_ID)
+    function montarDadosSheets(visita, corretorNome) {
+        const dados = {
+            id:             visita.id || '',
+            cliente:        visita.cliente || '',
+            telefone:       visita.telefone || '',
+            corretor:       corretorNome || '',
+            data:           visita.data || '',
+            horario:        visita.horario ? String(visita.horario).substring(0,5) : '',
+            local:          visita.local || '',
+            empreendimento: visita.empreendimento || '',
+            status:         visita.status || '',
+            observacoes:    visita.observacoes || ''
+        };
+        // Campos customizados criados em "Campos da Visita"
+        const extras = visita.dados_extras || {};
+        camposCache.filter(c => !c.campo_sistema).forEach(c => {
+            const v = extras[String(c.id)];
+            dados['extra_' + c.id] = Array.isArray(v) ? v.join(', ') : (v ?? '');
+        });
+        return dados;
+    }
+
     async function enviarParaSheetsComDados(dados) {
         const url = sheetsConfig.url || memCacheConfig?.sheets_url;
 
@@ -2582,13 +2597,14 @@ function doGet(e) {
             return;
         }
 
-        // Monta params respeitando a ordem e os campos configurados
+        // Monta params respeitando a ordem e os campos configurados.
+        // Separador "|" (não vírgula): labels podem conter vírgula e quebrariam o split no script.
         const colunas = sheetsConfig.campos?.length ? sheetsConfig.campos : SHEETS_CAMPOS_PADRAO;
         const params  = new URLSearchParams();
-        params.append('_colunas', colunas.join(','));
-        params.append('_headers', colunas.map(k => getLabelCampoSheets(k)).join(','));
+        params.append('_colunas', colunas.join('|'));
+        params.append('_headers', colunas.map(k => getLabelCampoSheets(k)).join('|'));
         colunas.forEach(key => {
-            const val = dados[key] !== undefined ? dados[key] : (dados['extra_' === key.substring(0,6) ? key.replace('extra_','') : ''] || '');
+            const val = dados[key];
             params.append(key, val !== null && val !== undefined ? String(val) : '');
         });
         // Sempre inclui ID para identificar a linha
@@ -2624,38 +2640,6 @@ function doGet(e) {
         }
     }
 
-    function montarUrlSheets(url, visita, corretor) {
-        // GET com params na URL — único método 100% confiável com Apps Script + no-cors
-        const p = new URLSearchParams({
-            id:            visita.id || '',
-            cliente:       visita.cliente || '',
-            telefone:      visita.telefone || '',
-            corretor:      corretor || '',
-            data:          visita.data || '',
-            horario:       visita.horario ? visita.horario.substring(0,5) : '',
-            local:         visita.local || '',
-            empreendimento: visita.empreendimento || '',
-            status:        visita.status || '',
-            observacoes:   visita.observacoes || ''
-        });
-        return url + '?' + p.toString();
-    }
-
-    async function enviarParaSheets(visita) {
-        const url = sheetsConfig.url || memCacheConfig?.sheets_url;
-        if (!url) return;
-        const statusesAtivos = sheetsConfig.statuses || memCacheConfig?.sheets_sincronizar_status || ['compareceu','nao_compareceu'];
-        if (!statusesAtivos.includes(visita.status)) return;
-
-        const corretor = corretoresCache.find(c => c.id === visita.corretor_id)?.nome || '';
-        try {
-            await fetch(montarUrlSheets(url, visita, corretor), { method: 'GET', mode: 'no-cors' });
-            adicionarLogSheets('Enviado: ' + (visita.cliente||'?') + ' → ' + visita.status, 'sucesso');
-        } catch(e) {
-            adicionarLogSheets('Falha ao enviar ' + (visita.cliente||'?') + ': ' + e.message, 'erro');
-        }
-    }
-
     async function sincronizarTodasVisitasSheets() {
         const url = sheetsConfig.url || memCacheConfig?.sheets_url;
         if (!url) { exibirAlertaErroToast('Configure a URL do Apps Script primeiro.'); return; }
@@ -2680,7 +2664,8 @@ function doGet(e) {
         for (const v of paraEnviar) {
             try {
                 const corretor = corretoresCache.find(c => c.id === v.corretor_id)?.nome || '';
-                await fetch(montarUrlSheets(url, v, corretor), { method: 'GET', mode: 'no-cors' });
+                // Usa o mesmo caminho do salvamento individual: respeita a ordem das colunas configuradas
+                await enviarParaSheetsComDados(montarDadosSheets(v, corretor));
                 ok++;
             } catch(e) { err++; }
         }
