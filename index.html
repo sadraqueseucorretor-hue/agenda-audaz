@@ -677,12 +677,21 @@ function doGet(e) {
     var headers = p._headers ? p._headers.split(",") : colunas.slice();
     headers.push("Atualizado");
 
-    if (!aba) {
-      aba = ss.insertSheet(ABA);
-      aba.getRange(1,1,1,headers.length).setValues([headers])
-         .setFontWeight("bold").setBackground("#1a1a2e").setFontColor("#ffffff");
-      aba.setFrozenRows(1);
-    } else if (aba.getLastRow() === 0) {
+    if (!aba) aba = ss.insertSheet(ABA);
+
+    // O cabecalho SEMPRE acompanha a ordem das colunas enviadas.
+    // Sem isso, mudar a config na agenda desalinha os dados das colunas.
+    var cabAtual = aba.getLastRow() > 0
+      ? aba.getRange(1,1,1,Math.max(aba.getLastColumn(),headers.length)).getValues()[0]
+      : [];
+    var precisaAtualizar = cabAtual.length === 0;
+    for (var h = 0; h < headers.length; h++) {
+      if (String(cabAtual[h] || "") !== String(headers[h])) { precisaAtualizar = true; break; }
+    }
+    if (precisaAtualizar) {
+      if (aba.getLastColumn() > headers.length) {
+        aba.getRange(1, headers.length + 1, 1, aba.getLastColumn() - headers.length).clearContent();
+      }
       aba.getRange(1,1,1,headers.length).setValues([headers])
          .setFontWeight("bold").setBackground("#1a1a2e").setFontColor("#ffffff");
       aba.setFrozenRows(1);
@@ -704,6 +713,10 @@ function doGet(e) {
 
     if (idx > 0) {
       aba.getRange(idx,1,1,linha.length).setValues([linha]);
+      // Limpa sobras de configuracoes antigas com mais colunas
+      if (aba.getLastColumn() > linha.length) {
+        aba.getRange(idx, linha.length + 1, 1, aba.getLastColumn() - linha.length).clearContent();
+      }
     } else {
       aba.appendRow(linha);
       idx = aba.getLastRow();
