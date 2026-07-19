@@ -1815,9 +1815,7 @@ function doGet(e) {
             local:         payload.local || '',
             empreendimento: payload.empreendimento || '',
             status:        payload.status || 'agendada',
-            observacoes:   payload.observacoes || '',
-            // Data de cadastro: usa a do banco (edição) ou agora (novo registro)
-            cadastrado_em: formatarDataHoraBR(resultado?.[0]?.created_at || new Date().toISOString())
+            observacoes:   payload.observacoes || ''
         });
     }
 
@@ -2322,9 +2320,8 @@ function doGet(e) {
         { key:'empreendimento', label:'Empreendimento' },
         { key:'status',         label:'Status' },
         { key:'observacoes',    label:'Observações' },
-        { key:'cadastrado_em',  label:'Data de Cadastro' },
     ];
-    const SHEETS_CAMPOS_PADRAO = ['id','cliente','telefone','corretor','data','horario','empreendimento','status','cadastrado_em'];
+    const SHEETS_CAMPOS_PADRAO = ['id','cliente','telefone','corretor','data','horario','empreendimento','status'];
 
     async function carregarConfigSheets() {
         // Se memCacheConfig não carregou ainda, busca direto do banco
@@ -2458,15 +2455,6 @@ function doGet(e) {
     }
 
     // Pega o valor de um campo da visita pelo key
-    // Formata timestamp do banco (created_at) para dd/mm/aaaa HH:MM
-    function formatarDataHoraBR(ts) {
-        if (!ts) return '';
-        const d = new Date(ts);
-        if (isNaN(d)) return '';
-        const p = n => String(n).padStart(2, '0');
-        return `${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
-    }
-
     function getValorCampoSheets(visita, key, corretorNome) {
         const mapa = {
             id:             visita.id || '',
@@ -2478,8 +2466,7 @@ function doGet(e) {
             local:          visita.local || '',
             empreendimento: visita.empreendimento || '',
             status:         visita.status || '',
-            observacoes:    visita.observacoes || '',
-            cadastrado_em:  formatarDataHoraBR(visita.created_at)
+            observacoes:    visita.observacoes || ''
         };
         if (key in mapa) return mapa[key];
         // Campo customizado (extra_ID)
@@ -2673,19 +2660,7 @@ function doGet(e) {
         for (const v of paraEnviar) {
             try {
                 const corretor = corretoresCache.find(c => c.id === v.corretor_id)?.nome || '';
-                await enviarParaSheetsComDados({
-                    id:            v.id,
-                    cliente:       v.cliente || '',
-                    telefone:      v.telefone || '',
-                    corretor,
-                    data:          v.data || '',
-                    horario:       v.horario ? String(v.horario).substring(0,5) : '',
-                    local:         v.local || '',
-                    empreendimento: v.empreendimento || '',
-                    status:        v.status || '',
-                    observacoes:   v.observacoes || '',
-                    cadastrado_em: formatarDataHoraBR(v.created_at)
-                });
+                await fetch(montarUrlSheets(url, v, corretor), { method: 'GET', mode: 'no-cors' });
                 ok++;
             } catch(e) { err++; }
         }
